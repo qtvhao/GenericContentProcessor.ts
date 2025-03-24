@@ -1,0 +1,23 @@
+{
+  "name": "genericcontentprocessor.ts",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/qtvhao/GenericContentProcessor.ts#readme",
+  "bugs": {
+    "url": "https://github.com/qtvhao/GenericContentProcessor.ts/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qtvhao/GenericContentProcessor.ts.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.13"
+  }
+}
