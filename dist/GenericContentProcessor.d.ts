@@ -34,6 +34,7 @@ interface PodcastResponse {
 }
 export declare class GenericContentProcessor {
     private svc;
+    private imageDownloaderCache;
     constructor(svc: BilingualPodcastService);
     checkServiceHealth(): Promise<boolean>;
     fetchImages(query: string): Promise<string[]>;

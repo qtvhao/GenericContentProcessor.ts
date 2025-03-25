@@ -5,6 +5,7 @@ import path from "path";
 import { extractWords } from "./utils/words.js";
 export class GenericContentProcessor {
     svc;
+    imageDownloaderCache = new Map();
     constructor(svc) {
         this.svc = svc;
     }
@@ -21,7 +22,11 @@ export class GenericContentProcessor {
     }
     async fetchImages(query) {
         console.debug(`📥 Fetching images for query: "${query}"`);
-        const imageDownloader = new ImageDownloader(query, 12);
+        let imageDownloader = this.imageDownloaderCache.get(query);
+        if (!imageDownloader) {
+            imageDownloader = new ImageDownloader(query, 12);
+            this.imageDownloaderCache.set(query, imageDownloader);
+        }
         const imagesBuffer = await imageDownloader.downloadAllImages();
         const imageFilePaths = imagesBuffer.map((buffer, index) => {
             const tmpDir = os.tmpdir();
