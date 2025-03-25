@@ -76,12 +76,15 @@ export class ImageDownloader {
         console.log(`Applying 5-second timeout for image ${index + 1}`);
       }
 
+      const isCached = this.cache.has(index);
       const buffer = await this.downloadImage(index, timeoutMs);
       if (buffer) {
         imageBuffers.push(buffer);
       }
 
-      await this.sleep(1000); // Wait 1 second between requests
+      if (!isCached) {
+        await this.sleep(1000); // Wait 1 second between requests only if not cached
+      }
     }
 
     console.log('Download complete!');
