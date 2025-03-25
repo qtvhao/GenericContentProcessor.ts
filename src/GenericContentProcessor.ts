@@ -35,6 +35,7 @@ interface PodcastResponse {
 
 export class GenericContentProcessor {
     private svc: BilingualPodcastService;
+    private imageDownloaderCache: Map<string, ImageDownloader> = new Map();
 
     constructor(svc: BilingualPodcastService) {
         this.svc = svc;
@@ -53,7 +54,12 @@ export class GenericContentProcessor {
 
     async fetchImages(query: string): Promise<string[]> {
         console.debug(`📥 Fetching images for query: "${query}"`);
-        const imageDownloader = new ImageDownloader(query, 12);
+        let imageDownloader = this.imageDownloaderCache.get(query);
+        if (!imageDownloader) {
+            imageDownloader = new ImageDownloader(query, 12);
+            this.imageDownloaderCache.set(query, imageDownloader);
+        }
+
         const imagesBuffer = await imageDownloader.downloadAllImages();
 
         const imageFilePaths = imagesBuffer.map((buffer, index) => {

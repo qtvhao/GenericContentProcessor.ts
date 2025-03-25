@@ -5,6 +5,7 @@ export class ImageDownloader {
   private searchQuery: string;
   private limit: number;
   private headers: Record<string, string>;
+  private cache: Map<number, Buffer>; // Cache to store downloaded images
 
   constructor(searchQuery: string, limit: number = 10) {
     this.baseUrl = 'https://http-fotosutokku-kiban-production-80.schnworks.com/search';
@@ -13,10 +14,17 @@ export class ImageDownloader {
     this.headers = {
       'User-Agent': 'Mozilla/5.0 (compatible; NanoTechImageDownloader/1.0)',
     };
+    this.cache = new Map();
   }
 
   // Download a single image by index and return its buffer
   private async downloadImage(index: number, timeoutMs?: number): Promise<Buffer | null> {
+    // Check cache first
+    if (this.cache.has(index)) {
+      console.log(`Image ${index + 1} retrieved from cache.`);
+      return this.cache.get(index) || null;
+    }
+
     const params = {
       query: this.searchQuery,
       limit: this.limit,
@@ -45,6 +53,8 @@ export class ImageDownloader {
 
       const buffer = Buffer.from(response.data);
       console.log(`Downloaded image ${index + 1} -> Buffer size: ${buffer.length} bytes`);
+
+      this.cache.set(index, buffer); // Store in cache
 
       return buffer;
     } catch (error) {
