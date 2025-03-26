@@ -113,7 +113,7 @@ class BilingualPodcastService {
         return statusResponse;
       }
       
-      console.log(`Attempt ${attempt + 1}: Podcast not ready yet. Retrying in ${delay / 1000} seconds...`);
+      console.log(`[BAIRINGARU] Attempt ${attempt + 1}: Podcast not ready yet. Retrying in ${delay / 1000} seconds...`);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
     
