@@ -14,13 +14,29 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dotenv@npm:^16.4.7":
+  version: 16.4.7
+  resolution: "dotenv@npm:16.4.7"
+  checksum: c27419b5875a44addcc56cc69b7dc5b0e6587826ca85d5b355da9303c6fc317fc9989f1f18366a16378c9fdd9532d14117a1abe6029cc719cdbbef6eaef2cea4
+  languageName: node
+  linkType: hard
+
 "genericcontentprocessor.ts@workspace:.":
   version: 0.0.0-use.local
   resolution: "genericcontentprocessor.ts@workspace:."
   dependencies:
     "@types/node": ^22.13.13
+    dotenv: ^16.4.7
+    kafkajs: ^2.2.4
   languageName: unknown
   linkType: soft
+
+"kafkajs@npm:^2.2.4":
+  version: 2.2.4
+  resolution: "kafkajs@npm:2.2.4"
+  checksum: 83e9e8bc50a09b142f4ff79f6a2bd88ecc21b83bcefe6621ab1716118d624886befb7371731274f67812ce35dd50b53140ff3b49a06e5d9169fe6b164d72fea5
+  languageName: node
+  linkType: hard
 
 "undici-types@npm:~6.20.0":
   version: 6.20.0

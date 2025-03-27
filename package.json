@@ -19,5 +19,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.13"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "kafkajs": "^2.2.4"
   }
 }
