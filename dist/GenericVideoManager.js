@@ -88,11 +88,15 @@ export class GenericVideoManager {
             topic: 'video-completion-topic',
             groupId: 'video-manager-group',
             eachMessageHandler: async ({ message }) => {
+                console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
                 this.handleKafkaMessage(message, correlationMap);
                 if (this.completed.size === correlationIds.length) {
                     console.log('🏁 All video completions received via Kafka!');
                     await consumer.stop(); // ✅ Gracefully stop the consumer
                     console.log('🛑 Kafka consumer stopped.');
+                }
+                else {
+                    console.debug(`📊 Completion progress: ${this.completed.size}/${correlationIds.length}`);
                 }
             }
         });
@@ -110,17 +114,31 @@ export class GenericVideoManager {
     handleKafkaMessage(message, correlationMap) {
         try {
             const value = message.value?.toString();
-            if (!value)
+            if (!value) {
+                console.debug('⚠️ Kafka message value is empty or undefined.');
                 return;
+            }
             const parsed = JSON.parse(value);
             const correlationId = parsed.correlationId;
             const status = parsed.status;
-            if (status === 'completed' && correlationMap.has(correlationId)) {
-                if (!this.completed.has(correlationId)) {
-                    this.completed.add(correlationId);
-                    const { index, filePath } = correlationMap.get(correlationId);
-                    console.log(`✅ [Clip ${index + 1}] Video completed at ${filePath}`);
+            console.debug(`📦 Parsed Kafka message - CorrelationId: ${correlationId}, Status: ${status}`);
+            if (status === 'completed') {
+                if (correlationMap.has(correlationId)) {
+                    if (!this.completed.has(correlationId)) {
+                        this.completed.add(correlationId);
+                        const { index, filePath } = correlationMap.get(correlationId);
+                        console.log(`✅ [Clip ${index + 1}] Video completed at ${filePath}`);
+                    }
+                    else {
+                        console.debug(`⚠️ Duplicate completion message received for correlationId: ${correlationId}`);
+                    }
                 }
+                else {
+                    console.warn(`❓ Unknown correlationId received: ${correlationId}`);
+                }
+            }
+            else {
+                console.debug(`ℹ️ Ignored message with non-completed status: ${status}`);
             }
         }
         catch (err) {
