@@ -68,7 +68,7 @@ class BilingualPodcastService {
                 await writeCache(cacheKey, Buffer.from(JSON.stringify(statusResponse)));
                 return statusResponse;
             }
-            console.log(`Attempt ${attempt + 1}: Podcast not ready yet. Retrying in ${delay / 1000} seconds...`);
+            console.log(`[BAIRINGARU] Attempt ${attempt + 1}: Podcast not ready yet. Retrying in ${delay / 1000} seconds...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
         }
         console.error('Max retries reached. Podcast not available.');
