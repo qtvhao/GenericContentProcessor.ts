@@ -86,7 +86,7 @@ export class GenericVideoManager {
         return new Promise(async (resolve, reject) => {
             try {
                 const consumer = await startKafkaConsumer({
-                    topic: 'video-completion-topic',
+                    topic: process.env.VIDEO_COMPLETION_GATHER_TOPIC || 'video-completion-topic',
                     groupId: 'video-manager-group',
                     eachMessageHandler: async ({ message }) => {
                         console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
