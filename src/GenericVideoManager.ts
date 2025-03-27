@@ -6,8 +6,6 @@ import { startKafkaConsumer } from "./kafka/kafkaConsumer.js";
 import { Consumer } from "kafkajs";
 
 export class GenericVideoManager {
-    private completed = new Set<string>();
-
     constructor() {}
 
     async processVideos(
@@ -108,25 +106,33 @@ export class GenericVideoManager {
         correlationIds: string[],
         outputFilePaths: string[]
     ): Promise<void> {
-        this.completed.clear();
+        const completed = new Set<string>();
         const correlationMap = this.buildCorrelationMap(correlationIds, outputFilePaths);
 
         console.debug('📥 Starting Kafka consumer for video completions...');
 
-        const consumer: Consumer = await startKafkaConsumer({
-            topic: 'video-completion-topic',
-            groupId: 'video-manager-group',
-            eachMessageHandler: async ({ message }) => {
-                console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
-                this.handleKafkaMessage(message, correlationMap);
+        return new Promise<void>(async (resolve, reject) => {
+            try {
+                const consumer: Consumer = await startKafkaConsumer({
+                    topic: 'video-completion-topic',
+                    groupId: 'video-manager-group',
+                    eachMessageHandler: async ({ message }) => {
+                        console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
+                        this.handleKafkaMessage(message, correlationMap, completed);
 
-                if (this.completed.size === correlationIds.length) {
-                    console.log('🏁 All video completions received via Kafka!');
-                    await consumer.stop(); // ✅ Gracefully stop the consumer
-                    console.log('🛑 Kafka consumer stopped.');
-                } else {
-                    console.debug(`📊 Completion progress: ${this.completed.size}/${correlationIds.length}`);
-                }
+                        if (completed.size === correlationIds.length) {
+                            console.log('🏁 All video completions received via Kafka!');
+                            await consumer.stop();
+                            console.log('🛑 Kafka consumer stopped.');
+                            resolve();
+                        } else {
+                            console.debug(`📊 Completion progress: ${completed.size}/${correlationIds.length}`);
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error('❌ Kafka consumer error:', err);
+                reject(err);
             }
         });
     }
@@ -147,7 +153,8 @@ export class GenericVideoManager {
 
     private handleKafkaMessage(
         message: any,
-        correlationMap: Map<string, { index: number; filePath: string }>
+        correlationMap: Map<string, { index: number; filePath: string }>,
+        completed: Set<string>
     ): void {
         try {
             const value = message.value?.toString();
@@ -164,8 +171,8 @@ export class GenericVideoManager {
 
             if (status === 'completed') {
                 if (correlationMap.has(correlationId)) {
-                    if (!this.completed.has(correlationId)) {
-                        this.completed.add(correlationId);
+                    if (!completed.has(correlationId)) {
+                        completed.add(correlationId);
 
                         const { index, filePath } = correlationMap.get(correlationId)!;
                         console.log(`✅ [Clip ${index + 1}] Video completed at ${filePath}`);
