@@ -116,7 +116,7 @@ export class KafkaVideoCompletionHandler {
 
         return new Promise<void>(async (resolve, reject) => {
             try {
-                const consumer: Consumer = await startKafkaConsumer({
+                await startKafkaConsumer({
                     topic: process.env.VIDEO_COMPLETION_GATHER_TOPIC || 'video-completion-topic',
                     groupId: 'video-manager-group',
                     eachMessageHandler: async ({ message }) => {
@@ -125,8 +125,6 @@ export class KafkaVideoCompletionHandler {
 
                         if (completed.size === correlationIds.length) {
                             console.log('🏁 All video completions received via Kafka!');
-                            await consumer.stop();
-                            console.log('🛑 Kafka consumer stopped.');
                             resolve();
                         } else {
                             console.debug(`📊 Completion progress: ${completed.size}/${correlationIds.length}`);
