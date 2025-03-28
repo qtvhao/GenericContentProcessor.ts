@@ -26,7 +26,21 @@ export const startKafkaConsumer = async ({ topic, groupId, eachMessageHandler })
         console.log(`✅ Kafka Consumer connected (Group: ${groupId})`);
         await consumer.subscribe({ topic, fromBeginning: false });
         console.log(`🎧 Listening for messages on topic: ${topic}`);
-        await consumer.run({ eachMessage: eachMessageHandler });
+        await consumer.run({
+            autoCommit: false,
+            eachMessage: async (payload) => {
+                const { topic, partition, message } = payload;
+                await consumer.commitOffsets([
+                    {
+                        topic,
+                        partition,
+                        offset: (parseInt(message.offset, 10) + 1).toString(), // Commit the *next* offset
+                    },
+                ]);
+                //
+                await eachMessageHandler(payload);
+            }
+        });
     }
     catch (error) {
         console.error(`❌ Error starting Kafka consumer for topic ${topic}:`, error);

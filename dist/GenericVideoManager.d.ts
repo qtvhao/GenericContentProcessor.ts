@@ -5,7 +5,9 @@ export declare class GenericVideoManager {
     private requestVideoCreations;
     private pollForVideoCompletions;
     private concatVideosWithFFmpeg;
-    private waitForVideoCompletions;
+}
+export declare class KafkaVideoCompletionHandler {
+    waitForVideoCompletions(correlationIds: string[], outputFilePaths: string[]): Promise<void>;
     private buildCorrelationMap;
     private handleKafkaMessage;
 }

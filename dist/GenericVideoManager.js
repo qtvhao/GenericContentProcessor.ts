@@ -12,7 +12,8 @@ export class GenericVideoManager {
             console.debug('⏳ Waiting for video completion...');
             const outputFilePaths = options.map(opt => opt.outputFilePath);
             if (useKafka) {
-                await this.waitForVideoCompletions(correlationIds, outputFilePaths);
+                const kafkaHandler = new KafkaVideoCompletionHandler();
+                await kafkaHandler.waitForVideoCompletions(correlationIds, outputFilePaths);
             }
             else {
                 await this.pollForVideoCompletions(correlationIds, outputFilePaths);
@@ -70,7 +71,7 @@ export class GenericVideoManager {
             ffmpeg.on('close', code => {
                 if (code === 0) {
                     console.log('🎥 ffmpeg process completed successfully.');
-                    fs.unlinkSync(listFilePath); // Clean up
+                    fs.unlinkSync(listFilePath);
                     resolve();
                 }
                 else {
@@ -79,6 +80,8 @@ export class GenericVideoManager {
             });
         });
     }
+}
+export class KafkaVideoCompletionHandler {
     async waitForVideoCompletions(correlationIds, outputFilePaths) {
         const completed = new Set();
         const correlationMap = this.buildCorrelationMap(correlationIds, outputFilePaths);
