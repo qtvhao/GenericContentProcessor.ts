@@ -26,7 +26,7 @@ const ensureTopicExists = async (kafka: Kafka, topic: string): Promise<void> => 
 /**
  * Starts a Kafka consumer with a given topic and message handler.
  */
-export const startKafkaConsumer = async ({ topic, groupId, eachMessageHandler }: KafkaConsumerOptions): Promise<Consumer> => {
+export const startKafkaConsumer = async ({ topic, groupId, eachMessageHandler }: KafkaConsumerOptions): Promise<void> => {
     const kafka: Kafka = getKafkaConnection();
     const consumer: Consumer = kafka.consumer({ groupId });
 
@@ -38,21 +38,7 @@ export const startKafkaConsumer = async ({ topic, groupId, eachMessageHandler }:
         await consumer.subscribe({ topic, fromBeginning: false });
         console.log(`🎧 Listening for messages on topic: ${topic}`);
 
-        await consumer.run({
-            autoCommit: false,
-            eachMessage: async (payload) => {
-                const { topic, partition, message } = payload
-                await consumer.commitOffsets([
-                    {
-                        topic,
-                        partition,
-                        offset: (parseInt(message.offset, 10) + 1).toString(), // Commit the *next* offset
-                    },
-                ]);
-                //
-                await eachMessageHandler(payload)
-            }
-        });
+        await consumer.run({ eachMessage: eachMessageHandler });
     } catch (error) {
         console.error(`❌ Error starting Kafka consumer for topic ${topic}:`, error);
     }
@@ -60,8 +46,6 @@ export const startKafkaConsumer = async ({ topic, groupId, eachMessageHandler }:
     // Handle graceful shutdown
     process.on('SIGTERM', async () => await shutdownKafkaConsumer(consumer));
     process.on('SIGINT', async () => await shutdownKafkaConsumer(consumer));
-
-    return consumer;
 };
 
 /**

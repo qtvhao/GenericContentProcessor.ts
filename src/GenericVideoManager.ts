@@ -105,14 +105,19 @@ export class GenericVideoManager {
 }
 
 export class KafkaVideoCompletionHandler {
+    private correlationTracker = new CorrelationTracker();
+
     async waitForVideoCompletions(
         correlationIds: string[],
         outputFilePaths: string[]
     ): Promise<void> {
-        const completed = new Set<string>();
         const correlationMap = this.buildCorrelationMap(correlationIds, outputFilePaths);
 
         console.debug('📥 Starting Kafka consumer for video completions...');
+
+        this.correlationTracker.waitForAll(correlationIds, () => {
+            console.log('🏋️ All video completions received via Kafka!');
+        });
 
         return new Promise<void>(async (resolve, reject) => {
             try {
@@ -121,16 +126,12 @@ export class KafkaVideoCompletionHandler {
                     groupId: 'video-manager-group',
                     eachMessageHandler: async ({ message }) => {
                         console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
-                        this.handleKafkaMessage(message, correlationMap, completed);
-
-                        if (completed.size === correlationIds.length) {
-                            console.log('🏁 All video completions received via Kafka!');
-                            resolve();
-                        } else {
-                            console.debug(`📊 Completion progress: ${completed.size}/${correlationIds.length}`);
-                        }
+                        this.handleKafkaMessage(message, correlationMap);
+                        this.correlationTracker.markCompleted(JSON.parse(message.value?.toString() || '{}').correlationId);
                     }
                 });
+
+                this.correlationTracker.waitForAll(correlationIds, resolve);
             } catch (err) {
                 console.error('❌ Kafka consumer error:', err);
                 reject(err);
@@ -154,8 +155,7 @@ export class KafkaVideoCompletionHandler {
 
     private handleKafkaMessage(
         message: any,
-        correlationMap: Map<string, { index: number; filePath: string }>,
-        completed: Set<string>
+        correlationMap: Map<string, { index: number; filePath: string }>
     ): void {
         try {
             const value = message.value?.toString();
@@ -172,14 +172,8 @@ export class KafkaVideoCompletionHandler {
 
             if (status === 'completed') {
                 if (correlationMap.has(correlationId)) {
-                    if (!completed.has(correlationId)) {
-                        completed.add(correlationId);
-
-                        const { index, filePath } = correlationMap.get(correlationId)!;
-                        console.log(`✅ [Clip ${index + 1}] Video completed at ${filePath}`);
-                    } else {
-                        console.debug(`⚠️ Duplicate completion message received for correlationId: ${correlationId}`);
-                    }
+                    const { index, filePath } = correlationMap.get(correlationId)!;
+                    console.log(`✅ [Clip ${index + 1}] Video completed at ${filePath}`);
                 } else {
                     console.warn(`❓ Unknown correlationId received: ${correlationId}`);
                 }
@@ -188,6 +182,26 @@ export class KafkaVideoCompletionHandler {
             }
         } catch (err) {
             console.error('❌ Error handling Kafka message:', err);
+        }
+    }
+}
+
+class CorrelationTracker {
+    private tasks: Array<{ pending: Set<string>; resolve: () => void }> = [];
+
+    waitForAll(correlationIds: string[], resolve: () => void): void {
+        const pendingSet = new Set(correlationIds);
+        this.tasks.push({ pending: pendingSet, resolve });
+    }
+
+    markCompleted(correlationId: string): void {
+        for (let i = this.tasks.length - 1; i >= 0; i--) {
+            const task = this.tasks[i];
+            task.pending.delete(correlationId);
+            if (task.pending.size === 0) {
+                task.resolve();
+                this.tasks.splice(i, 1);
+            }
         }
     }
 }
