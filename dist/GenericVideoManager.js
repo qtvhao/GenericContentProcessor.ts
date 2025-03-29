@@ -102,9 +102,9 @@ class KafkaVideoCompletionHandler {
                 topic: process.env.VIDEO_COMPLETION_GATHER_TOPIC || 'video-completion-topic',
                 groupId: 'video-manager-group',
                 eachMessageHandler: async ({ message }) => {
-                    console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
                     const parsedMessage = JSON.parse(message.value?.toString() || '{}');
                     if (parsedMessage.status === 'completed') {
+                        console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
                         this.correlationTracker.markCompleted(parsedMessage.correlationId);
                     }
                 }
@@ -126,7 +126,7 @@ class KafkaVideoCompletionHandler {
             console.debug(`🔗 Tracking correlationId: ${id} -> ${filePath}`);
         }
         return new Promise((resolve) => {
-            this.correlationTracker.waitForAll(correlationIds, () => {
+            this.correlationTracker.waitForAll(correlationIds).then(() => {
                 console.log('🏋️ All video completions received via Kafka!');
                 resolve();
             });

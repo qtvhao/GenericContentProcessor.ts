@@ -1,11 +1,17 @@
-type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-export declare class CorrelationTracker {
-    private tasks;
+declare enum LogLevel {
+    NONE = 0,
+    ERROR = 1,
+    WARN = 2,
+    INFO = 3,
+    DEBUG = 4
+}
+declare class CorrelationTracker {
+    private pendingCorrelations;
+    private waitingResolvers;
     private logLevel;
     setLogLevel(level: LogLevel): void;
-    waitForAll(correlationIds: string[], resolve: () => void): void;
-    markCompleted(correlationId: string): void;
-    private printTasks;
     private log;
+    waitForAll(correlationIds: string[]): Promise<void>;
+    markCompleted(correlationId: string): void;
 }
-export {};
+export { CorrelationTracker, LogLevel };

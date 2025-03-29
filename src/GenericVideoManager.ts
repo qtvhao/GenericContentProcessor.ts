@@ -159,7 +159,7 @@ class KafkaVideoCompletionHandler {
         }
 
         return new Promise<void>((resolve) => {
-            this.correlationTracker.waitForAll(correlationIds, () => {
+            this.correlationTracker.waitForAll(correlationIds).then(() => {
                 console.log('🏋️ All video completions received via Kafka!');
                 resolve();
             });

@@ -1,53 +1,50 @@
-export class CorrelationTracker {
-    tasks = [];
-    logLevel = 'DEBUG';
+var LogLevel;
+(function (LogLevel) {
+    LogLevel[LogLevel["NONE"] = 0] = "NONE";
+    LogLevel[LogLevel["ERROR"] = 1] = "ERROR";
+    LogLevel[LogLevel["WARN"] = 2] = "WARN";
+    LogLevel[LogLevel["INFO"] = 3] = "INFO";
+    LogLevel[LogLevel["DEBUG"] = 4] = "DEBUG";
+})(LogLevel || (LogLevel = {}));
+class CorrelationTracker {
+    pendingCorrelations = new Map();
+    waitingResolvers = [];
+    logLevel = LogLevel.NONE;
     setLogLevel(level) {
         this.logLevel = level;
-        this.log('INFO', `Log level set to ${level}`);
-    }
-    waitForAll(correlationIds, resolve) {
-        const pendingSet = new Set(correlationIds);
-        this.tasks.push({ pending: pendingSet, resolve });
-        this.log('INFO', `🕒 Waiting for: ${Array.from(pendingSet).join(', ')}`);
-        this.printTasks();
-    }
-    markCompleted(correlationId) {
-        this.log('INFO', `✅ Marking completed: ${correlationId}`);
-        for (let i = this.tasks.length - 1; i >= 0; i--) {
-            const task = this.tasks[i];
-            if (task.pending.has(correlationId)) {
-                task.pending.delete(correlationId);
-                this.log('DEBUG', `🧹 Removed '${correlationId}' from task ${i}. Remaining: ${Array.from(task.pending).join(', ') || 'None'}`);
-                if (task.pending.size === 0) {
-                    this.log('INFO', `🎉 Task ${i} completed. Resolving...`);
-                    task.resolve();
-                    this.tasks.splice(i, 1);
-                    this.log('DEBUG', `🗑️ Removed resolved task ${i}`);
-                }
-            }
-        }
-        this.printTasks();
-    }
-    printTasks() {
-        if (this.tasks.length === 0) {
-            this.log('INFO', `📭 No pending tasks.`);
-            return;
-        }
-        this.log('INFO', `📌 Current pending tasks (${this.tasks.length}):`);
-        this.tasks.forEach((task, index) => {
-            this.log('INFO', `   🔸 Task ${index}: [${Array.from(task.pending).join(', ') || 'Completed'}]`);
-        });
     }
     log(level, message) {
-        const levels = {
-            'DEBUG': 0,
-            'INFO': 1,
-            'WARN': 2,
-            'ERROR': 3
-        };
-        if (levels[level] >= levels[this.logLevel]) {
-            const timestamp = new Date().toISOString();
-            console.log(`[${timestamp}] [${level}] ${message}`);
+        if (level <= this.logLevel) {
+            console.log(`[${LogLevel[level]}] ${message}`);
+        }
+    }
+    async waitForAll(correlationIds) {
+        const isAllCompleted = correlationIds.every(id => this.pendingCorrelations.get(id) === true);
+        if (isAllCompleted) {
+            this.log(LogLevel.INFO, `All correlation IDs already completed: ${correlationIds.join(', ')}`);
+            return;
+        }
+        for (const id of correlationIds) {
+            if (!this.pendingCorrelations.has(id)) {
+                this.pendingCorrelations.set(id, false);
+            }
+        }
+        this.log(LogLevel.DEBUG, `Waiting for IDs: ${correlationIds.join(', ')}`);
+        return new Promise(resolve => {
+            this.waitingResolvers.push({ ids: correlationIds, resolve });
+        });
+    }
+    markCompleted(correlationId) {
+        this.pendingCorrelations.set(correlationId, true);
+        this.log(LogLevel.INFO, `Marked completed: ${correlationId}`);
+        for (const { ids, resolve } of [...this.waitingResolvers]) {
+            const allDone = ids.every(id => this.pendingCorrelations.get(id) === true);
+            if (allDone) {
+                resolve();
+                this.log(LogLevel.DEBUG, `Resolved waiting callback for: ${ids.join(', ')}`);
+                this.waitingResolvers = this.waitingResolvers.filter(r => r.resolve !== resolve);
+            }
         }
     }
 }
+export { CorrelationTracker, LogLevel };
