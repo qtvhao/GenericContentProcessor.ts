@@ -82,29 +82,25 @@ export class GenericVideoManager {
     }
 }
 export class KafkaVideoCompletionHandler {
+    correlationTracker = new CorrelationTracker();
     async waitForVideoCompletions(correlationIds, outputFilePaths) {
-        const completed = new Set();
         const correlationMap = this.buildCorrelationMap(correlationIds, outputFilePaths);
         console.debug('📥 Starting Kafka consumer for video completions...');
+        this.correlationTracker.waitForAll(correlationIds, () => {
+            console.log('🏋️ All video completions received via Kafka!');
+        });
         return new Promise(async (resolve, reject) => {
             try {
-                const consumer = await startKafkaConsumer({
+                await startKafkaConsumer({
                     topic: process.env.VIDEO_COMPLETION_GATHER_TOPIC || 'video-completion-topic',
                     groupId: 'video-manager-group',
                     eachMessageHandler: async ({ message }) => {
                         console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
-                        this.handleKafkaMessage(message, correlationMap, completed);
-                        if (completed.size === correlationIds.length) {
-                            console.log('🏁 All video completions received via Kafka!');
-                            await consumer.stop();
-                            console.log('🛑 Kafka consumer stopped.');
-                            resolve();
-                        }
-                        else {
-                            console.debug(`📊 Completion progress: ${completed.size}/${correlationIds.length}`);
-                        }
+                        this.handleKafkaMessage(message, correlationMap);
+                        this.correlationTracker.markCompleted(JSON.parse(message.value?.toString() || '{}').correlationId);
                     }
                 });
+                this.correlationTracker.waitForAll(correlationIds, resolve);
             }
             catch (err) {
                 console.error('❌ Kafka consumer error:', err);
@@ -122,7 +118,7 @@ export class KafkaVideoCompletionHandler {
         });
         return map;
     }
-    handleKafkaMessage(message, correlationMap, completed) {
+    handleKafkaMessage(message, correlationMap) {
         try {
             const value = message.value?.toString();
             if (!value) {
@@ -135,14 +131,8 @@ export class KafkaVideoCompletionHandler {
             console.debug(`📦 Parsed Kafka message - CorrelationId: ${correlationId}, Status: ${status}`);
             if (status === 'completed') {
                 if (correlationMap.has(correlationId)) {
-                    if (!completed.has(correlationId)) {
-                        completed.add(correlationId);
-                        const { index, filePath } = correlationMap.get(correlationId);
-                        console.log(`✅ [Clip ${index + 1}] Video completed at ${filePath}`);
-                    }
-                    else {
-                        console.debug(`⚠️ Duplicate completion message received for correlationId: ${correlationId}`);
-                    }
+                    const { index, filePath } = correlationMap.get(correlationId);
+                    console.log(`✅ [Clip ${index + 1}] Video completed at ${filePath}`);
                 }
                 else {
                     console.warn(`❓ Unknown correlationId received: ${correlationId}`);
@@ -154,6 +144,23 @@ export class KafkaVideoCompletionHandler {
         }
         catch (err) {
             console.error('❌ Error handling Kafka message:', err);
+        }
+    }
+}
+class CorrelationTracker {
+    tasks = [];
+    waitForAll(correlationIds, resolve) {
+        const pendingSet = new Set(correlationIds);
+        this.tasks.push({ pending: pendingSet, resolve });
+    }
+    markCompleted(correlationId) {
+        for (let i = this.tasks.length - 1; i >= 0; i--) {
+            const task = this.tasks[i];
+            task.pending.delete(correlationId);
+            if (task.pending.size === 0) {
+                task.resolve();
+                this.tasks.splice(i, 1);
+            }
         }
     }
 }
