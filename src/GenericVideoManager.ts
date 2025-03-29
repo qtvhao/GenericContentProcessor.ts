@@ -129,7 +129,10 @@ class KafkaVideoCompletionHandler {
                 groupId: 'video-manager-group',
                 eachMessageHandler: async ({ message }) => {
                     console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
-                    this.correlationTracker.markCompleted(JSON.parse(message.value?.toString() || '{}').correlationId);
+                    const parsedMessage = JSON.parse(message.value?.toString() || '{}');
+                    if (parsedMessage.status === 'completed') {
+                        this.correlationTracker.markCompleted(parsedMessage.correlationId);
+                    }
                 }
             });
         } catch (err) {
