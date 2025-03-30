@@ -40,6 +40,7 @@ class VideoDownloader {
   public static async downloadVideo(videoBuffer: Buffer, outputFilePath: string): Promise<void> {
     try {
       fs.writeFileSync(outputFilePath, videoBuffer);
+      debugLog(`✅ Video saved to ${outputFilePath}`);
     } catch (error) {
       debugLog("❌ Error downloading video:");
       debugLog(error);
@@ -49,6 +50,7 @@ class VideoDownloader {
 
   public static async downloadVideoBuffer(response: Response): Promise<Buffer> {
     const arrayBuffer = await response.arrayBuffer();
+    debugLog("💾 Video buffer downloaded");
     return Buffer.from(arrayBuffer);
   }
 
@@ -74,10 +76,14 @@ class VideoDownloader {
     outputFilePath: string,
     onSuccess?: (index: number, filePath: string) => void
   ): Promise<boolean> {
+    debugLog(`⏳ Checking status for video ${index + 1} at ${pollUrl}`);
     const response = await this.fetchVideoStatus(pollUrl);
     const contentType = response.headers.get("content-type");
 
+    debugLog(`ℹ️ Content-Type received: ${contentType}`);
+
     if (contentType === "video/mp4") {
+      debugLog(`⬇️ Video is ready to download.`);
       const videoBuffer = await this.downloadVideoBuffer(response);
       await this.downloadVideo(videoBuffer, outputFilePath);
       console.log(`✅ [Video ${index + 1}] Download complete: ${outputFilePath}`);
@@ -85,6 +91,7 @@ class VideoDownloader {
       return true;
     }
 
+    debugLog(`❌ Video not ready yet. Content-Type: ${contentType}`);
     return false;
   }
 }
