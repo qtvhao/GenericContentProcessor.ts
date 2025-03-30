@@ -14,6 +14,7 @@ import axios, { AxiosResponse } from "axios";
 import FormData from "form-data";
 import fs from "fs";
 import path from "path";
+import { KafkaVideoCompletionHandler } from "./KafkaVideoCompletionHandler.js";
 
 interface TextData {
   word: string;
@@ -35,7 +36,61 @@ export interface VideoCreationOptions {
   outputFilePath: string;
 }
 
+class VideoDownloader {
+  public static async downloadVideo(videoBuffer: Buffer, outputFilePath: string): Promise<void> {
+    try {
+      fs.writeFileSync(outputFilePath, videoBuffer);
+    } catch (error) {
+      debugLog("❌ Error downloading video:");
+      debugLog(error);
+      throw new Error("Failed to download video.");
+    }
+  }
+
+  public static async downloadVideoBuffer(response: Response): Promise<Buffer> {
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  }
+
+  public static async fetchVideoStatus(pollUrl: string): Promise<Response> {
+    try {
+      const response = await fetch(pollUrl);
+      debugLog(`📡 Received response. Status: ${response.status}`);
+
+      if (!response.ok) {
+        debugLog(`⚠️ Non-OK HTTP status: ${response.status}. Retrying...`);
+      }
+
+      return response;
+    } catch (error) {
+      debugLog(`⚠️ Error occurred while polling for video: ${(error as Error).message}`);
+      throw error;
+    }
+  }
+
+  public static async handleDownloadIfReady(
+    index: number,
+    pollUrl: string,
+    outputFilePath: string,
+    onSuccess?: (index: number, filePath: string) => void
+  ): Promise<boolean> {
+    const response = await this.fetchVideoStatus(pollUrl);
+    const contentType = response.headers.get("content-type");
+
+    if (contentType === "video/mp4") {
+      const videoBuffer = await this.downloadVideoBuffer(response);
+      await this.downloadVideo(videoBuffer, outputFilePath);
+      console.log(`✅ [Video ${index + 1}] Download complete: ${outputFilePath}`);
+      onSuccess?.(index, outputFilePath);
+      return true;
+    }
+
+    return false;
+  }
+}
+
 class VideoCreationService {
+  private static kafkaHandler: KafkaVideoCompletionHandler | null;
   private static API_URL =
     "https://http-chokkanteki-okane-production-80.schnworks.com/api/v1/video-creation/";
 
@@ -50,7 +105,7 @@ class VideoCreationService {
       const formData = this.prepareFormData(options, absPaths);
       const correlationId = await this.requestVideoCreation(formData);
       const videoBuffer = await this.pollForVideo(correlationId);
-      await this.downloadVideo(videoBuffer, options.outputFilePath);
+      await VideoDownloader.downloadVideo(videoBuffer, options.outputFilePath);
 
       debugLog(`🎉 Video saved at: ${options.outputFilePath}`);
       return options.outputFilePath;
@@ -88,6 +143,21 @@ class VideoCreationService {
       console.error("❌ Error in bulk video creation requests:");
       console.error(error);
       throw new Error("Bulk video creation requests failed.");
+    }
+  }
+
+  public static async waitForVideoCompletions(correlationIds: string[], outputFilePaths: string[]) {
+    if (!VideoCreationService.kafkaHandler) {
+      VideoCreationService.kafkaHandler = new KafkaVideoCompletionHandler();
+    }
+
+    await VideoCreationService.kafkaHandler.waitForVideoCompletions(correlationIds, outputFilePaths);
+
+    for (let i = 0; i < correlationIds.length; i++) {
+      const pollUrl = `${VideoCreationService.API_URL}${correlationIds[i]}`;
+      const response = await VideoDownloader.fetchVideoStatus(pollUrl);
+      const videoBuffer = await VideoDownloader.downloadVideoBuffer(response);
+      await VideoDownloader.downloadVideo(videoBuffer, outputFilePaths[i]);
     }
   }
 
@@ -135,18 +205,15 @@ class VideoCreationService {
 
         try {
           const pollUrl = `${VideoCreationService.API_URL}${correlationId}`;
-          const response = await this.fetchVideoStatus(pollUrl);
-          const contentType = this.getContentType(response);
+          const downloaded = await VideoDownloader.handleDownloadIfReady(index, pollUrl, outputFilePath, onSuccess);
 
-          if (this.isVideoReady(response, contentType)) {
-            const videoBuffer = await this.downloadVideoBuffer(response);
-            await this.downloadVideo(videoBuffer, outputFilePath);
-            console.log(`✅ [Video ${index + 1}] Download complete: ${outputFilePath}`);
-            onSuccess?.(index, outputFilePath);
+          if (downloaded) {
             completed[index] = true;
           } else {
+            const response = await VideoDownloader.fetchVideoStatus(pollUrl);
+            const contentType = response.headers.get("content-type") || "";
             let progress: number = 0;
-            if (contentType?.startsWith('application/json')) {
+            if (contentType.startsWith('application/json')) {
               const progressData = await response.json();
               progress = progressData.progress || 0;
               const progressBar = VideoCreationService.createProgressBar(progress);
@@ -273,11 +340,11 @@ class VideoCreationService {
     while (attempts < maxAttempts) {
       debugLog(`🔎 Attempt ${attempts + 1} of ${maxAttempts}...`);
 
-      const response = await this.fetchVideoStatus(pollUrl);
+      const response = await VideoDownloader.fetchVideoStatus(pollUrl);
       const contentType = this.getContentType(response);
 
       if (this.isVideoReady(response, contentType)) {
-        return await this.downloadVideoBuffer(response);
+        return await VideoDownloader.downloadVideoBuffer(response);
       }
 
       if (contentType?.startsWith('application/json')) {
@@ -296,22 +363,6 @@ class VideoCreationService {
     throw new Error("Video processing timed out.");
   }
 
-  private static async fetchVideoStatus(pollUrl: string): Promise<Response> {
-    try {
-      const response = await fetch(pollUrl);
-      debugLog(`📡 Received response. Status: ${response.status}`);
-
-      if (!response.ok) {
-        debugLog(`⚠️ Non-OK HTTP status: ${response.status}. Retrying...`);
-      }
-
-      return response;
-    } catch (error) {
-      debugLog(`⚠️ Error occurred while polling for video: ${(error as Error).message}`);
-      throw error;
-    }
-  }
-
   private static getContentType(response: Response): string | null {
     const contentType = response.headers.get("content-type");
     debugLog(`📑 Content-Type received: ${contentType}`);
@@ -328,23 +379,8 @@ class VideoCreationService {
     return false;
   }
 
-  private static async downloadVideoBuffer(response: Response): Promise<Buffer> {
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-  }
-
   private static delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  private static async downloadVideo(videoBuffer: Buffer, outputFilePath: string): Promise<void> {
-    try {
-      fs.writeFileSync(outputFilePath, videoBuffer);
-    } catch (error) {
-      debugLog("❌ Error downloading video:");
-      debugLog(error);
-      throw new Error("Failed to download video.");
-    }
   }
 }
 

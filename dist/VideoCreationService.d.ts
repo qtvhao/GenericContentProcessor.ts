@@ -20,9 +20,11 @@ export interface VideoCreationOptions {
     outputFilePath: string;
 }
 declare class VideoCreationService {
+    private static kafkaHandler;
     private static API_URL;
     static createVideo(options: VideoCreationOptions): Promise<string>;
     static bulkRequestVideoCreation(optionsArray: VideoCreationOptions[]): Promise<string[]>;
+    static waitForVideoCompletions(correlationIds: string[], outputFilePaths: string[]): Promise<void>;
     static bulkPollForVideos(correlationIds: string[], outputFilePaths: string[], options?: {
         maxAttempts?: number;
         delay?: number;
@@ -35,11 +37,8 @@ declare class VideoCreationService {
     private static prepareFormData;
     private static requestVideoCreation;
     private static pollForVideo;
-    private static fetchVideoStatus;
     private static getContentType;
     private static isVideoReady;
-    private static downloadVideoBuffer;
     private static delay;
-    private static downloadVideo;
 }
 export default VideoCreationService;

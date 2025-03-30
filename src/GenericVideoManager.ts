@@ -2,16 +2,8 @@ import VideoCreationService, { VideoCreationOptions } from "./VideoCreationServi
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
-import { startKafkaConsumer } from "./kafka/kafkaConsumer.js";
-import { CorrelationTracker } from "./utils/CorrelationTracker.js";
 
 export class GenericVideoManager {
-    private kafkaHandler: KafkaVideoCompletionHandler | null;
-
-    constructor() {
-        this.kafkaHandler = null;
-    }
-
     async processVideos(
         options: VideoCreationOptions[],
         finalOutputPath: string,
@@ -24,14 +16,7 @@ export class GenericVideoManager {
             console.debug('⏳ Waiting for video completion...');
             const outputFilePaths = options.map(opt => opt.outputFilePath);
 
-            if (useKafka) {
-                if (!this.kafkaHandler) {
-                    this.kafkaHandler = new KafkaVideoCompletionHandler();
-                }
-                await this.kafkaHandler.waitForVideoCompletions(correlationIds, outputFilePaths);
-            } else {
-                await this.pollForVideoCompletions(correlationIds, outputFilePaths);
-            }
+            await this.pollForVideoCompletions(correlationIds, outputFilePaths, useKafka);
 
             console.log('🎉 All videos processed and downloaded!');
 
@@ -51,22 +36,30 @@ export class GenericVideoManager {
         return ids;
     }
 
-    private async pollForVideoCompletions(correlationIds: string[], outputFilePaths: string[]): Promise<void> {
+    private async pollForVideoCompletions(correlationIds: string[], outputFilePaths: string[], useKafka: boolean = false): Promise<void> {
         console.debug('📡 Polling for video completions...');
-        await VideoCreationService.bulkPollForVideos(
-            correlationIds,
-            outputFilePaths,
-            {
-                maxAttempts: 60 * 20,
-                delay: 1000,
-                onSuccess: (index, filePath) => {
-                    console.log(`✅ [Clip ${index + 1}] Video completed at ${filePath}`);
-                },
-                onError: (index, error) => {
-                    console.error(`❌ [Clip ${index + 1}] Failed after retries. Error: ${error.message}`);
+        const onSuccess =  (index: any, filePath: any) => {
+            console.log(`✅ [Clip ${index + 1}] Video completed at ${filePath}`);
+        };
+        const onError = (index: any, error: any) => {
+            console.error(`❌ [Clip ${index + 1}] Failed after retries. Error: ${error.message}`);
+        };
+
+        if (useKafka) {
+            await VideoCreationService.waitForVideoCompletions(correlationIds, outputFilePaths);
+        } else {
+            await VideoCreationService.bulkPollForVideos(
+                correlationIds,
+                outputFilePaths,
+                {
+                    maxAttempts: 60 * 20,
+                    delay: 1000,
+                    onSuccess,
+                    onError
                 }
-            }
-        );
+            );
+        }
+
         console.debug('🏁 Finished polling.');
     }
 
@@ -107,76 +100,5 @@ export class GenericVideoManager {
                 }
             });
         });
-    }
-}
-
-class KafkaVideoCompletionHandler {
-    private correlationTracker = new CorrelationTracker();
-    private isConsumerStarted = false;
-
-    constructor() {
-        this.startConsumer();
-    }
-
-    private async startConsumer() {
-        if (this.isConsumerStarted) return;
-
-        this.isConsumerStarted = true;
-
-        try {
-            await startKafkaConsumer({
-                topic: process.env.VIDEO_COMPLETION_GATHER_TOPIC || 'video-completion-topic',
-                groupId: 'video-manager-group',
-                eachMessageHandler: async ({ message }) => {
-                    const parsedMessage = JSON.parse(message.value?.toString() || '{}');
-                    if (parsedMessage.status === 'completed') {
-                        console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
-                        this.correlationTracker.markCompleted(parsedMessage.correlationId);
-                    }
-                }
-            });
-        } catch (err) {
-            console.error('❌ Kafka consumer error:', err);
-            throw err;
-        }
-    }
-
-    async waitForVideoCompletions(
-        correlationIds: string[],
-        outputFilePaths: string[]
-    ): Promise<void> {
-        if (correlationIds.length !== outputFilePaths.length) {
-            throw new Error('Mismatch between correlation IDs and output file paths count.');
-        }
-
-        const correlationMap = this.buildCorrelationMap(correlationIds, outputFilePaths);
-
-        console.debug('📥 Preparing to wait for video completions...');
-
-        // Log correlationId to filePath mappings
-        for (const [id, { filePath }] of correlationMap.entries()) {
-            console.debug(`🔗 Tracking correlationId: ${id} -> ${filePath}`);
-        }
-
-        return new Promise<void>((resolve) => {
-            this.correlationTracker.waitForAll(correlationIds).then(() => {
-                console.log('🏋️ All video completions received via Kafka!');
-                resolve();
-            });
-        });
-    }
-
-    private buildCorrelationMap(
-        correlationIds: string[],
-        outputFilePaths: string[]
-    ): Map<string, { index: number; filePath: string }> {
-        const map = new Map();
-        correlationIds.forEach((id, index) => {
-            map.set(id, {
-                index,
-                filePath: outputFilePaths[index]
-            });
-        });
-        return map;
     }
 }
