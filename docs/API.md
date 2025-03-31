@@ -1,89 +1,84 @@
-# Image Search & Retrieval API Documentation
+# 📷 Image API Documentation
 
 **Base URL:** `https://http-fotosutokku-kiban-production-80.schnworks.com/`
 
 ---
 
-## Endpoints
-
-### GET /search *(Deprecated)*
+## 🔍 GET `/search` (Deprecated)
 
 **Description:**  
-Legacy route for image search. No longer supported.
+This route is deprecated. Use `/quick-search` or `/get-image` instead.
 
-**Responses:**
-- `410 Gone` – Instructs to use `/quick-search` or `/get-image` instead.
+**Response:**
+- `410 Gone`: `"The /search route is deprecated. Please use /quick-search or /get-image."`
 
-### GET /quick-search
+---
+
+## ⚡ POST `/quick-search`
 
 **Description:**  
-Initiates an image search request by publishing a message to Kafka. Returns a conversation ID for tracking.
+Publishes a search request to Kafka for asynchronous image lookup.
+
+**Request Body (JSON):**
+```json
+{
+  "query": "puppies",          // Required: Search term
+  "output": "url" | "image",   // Optional: Response type (default: "html")
+  "limit": "10",               // Optional: Max number of results (default: "10")
+  "index": "1"                 // Optional: Index of specific image
+}
+```
+
+**Response:**
+- `202 Accepted`: `{ message: "Request accepted", conversationId: "conv-..." }`
+- `400 Bad Request`: Missing query
+- `500 Internal Server Error`: Kafka publish failed
+
+---
+
+## 🖼️ GET `/get-image`
+
+**Description:**  
+Fetch a specific image by search query and index from in-memory cache.
 
 **Query Parameters:**
-- `query` (string, required): Search term.
-- `output` (string, optional, default=html): Desired output format (html, url, image, etc.).
-- `limit` (string, optional, default=10): Max number of results.
-- `index` (string, optional): Index of a specific image (used when output=image).
+- `query` (string, required): Search term  
+- `output` (must be `"image"`)  
+- `index` (string, required): Index of image
 
-**Responses:**
-- `202 Accepted` – Request published successfully.
-  
-  ```json
-  {
-    "message": "Request accepted",
-    "conversationId": "conv-..."
-  }
-  ```
+**Response:**
+- `200 OK`: Returns image (`image/png`)  
+- `200 OK`: Returns JSON `{ fileKey }` if content is unavailable  
+- `400 Bad Request`: Invalid parameters  
+- `404 Not Found`: Image not found
 
-- `400 Bad Request` – Missing query parameter.
-- `500 Internal Server Error` – Kafka publishing error.
+---
 
-### GET /get-image
+## 🖼️ GET `/get-image/:output/:query/:index/image.jpg`
 
 **Description:**  
-Retrieves a specific image (or fallback fileKey) from stored results.
-
-**Query Parameters:**
-- `query` (string, required): Original search term.
-- `output` (string, required): Must be "image".
-- `index` (string, required): Image index to retrieve.
-
-**Responses:**
-- `200 OK` – Returns the image in binary (Content-Type: image/png).
-- `200 OK` – Returns `{ fileKey: string }` if image content is missing.
-- `400 Bad Request` – Invalid parameters.
-- `404 Not Found` – Image not found.
-
-### GET /get-image/:output/:query/:index/image.jpg
-
-**Description:**  
-Alternate path-based version of the /get-image endpoint. Returns a JPEG image.
+Path-based version of `/get-image` for accessing JPEG images.
 
 **Path Parameters:**
-- `output` (string): Must be "image".
-- `query` (string): Encoded search term.
-- `index` (string): Index of the image to return.
+- `output` (must be `"image"`)  
+- `query` (string, URL-encoded)  
+- `index` (integer)
 
-**Responses:**
-- `200 OK` – Image in binary (Content-Type: image/jpeg).
-- `200 OK` – Returns `{ fileKey: string }` if image content is missing.
-- `400 Bad Request` – Invalid output.
-- `404 Not Found` – Image not found.
+**Response:**
+- `200 OK`: Returns image (`image/jpeg`)  
+- `200 OK`: Returns JSON `{ fileKey }` if content is unavailable  
+- `400 Bad Request`: Invalid parameters  
+- `404 Not Found`: Image not found
 
-### GET /image-count/:query
+---
+
+## 📊 GET `/image-count/:query`
 
 **Description:**  
-Returns the number of images stored for a given search query.
+Returns the number of cached images for a given query.
 
 **Path Parameters:**
-- `query` (string): Encoded search term.
+- `query` (string, URL-encoded)
 
-**Responses:**
-- `200 OK`
-  
-  ```json
-  {
-    "query": "puppies",
-    "count": 5
-  }
-  ```
+**Response:**
+- `200 OK`: `{ query: "puppies", count: 5 }`
