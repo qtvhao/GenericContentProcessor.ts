@@ -1,11 +1,13 @@
+export type OutputType = 'url' | 'image';
 export declare class ImageDownloader {
     private baseUrl;
-    private searchQuery;
+    private query;
     private limit;
-    private headers;
-    private cache;
-    constructor(searchQuery: string, limit?: number);
-    private downloadImage;
+    constructor(searchQuery: string, limit?: number, baseUrl?: string);
+    private quickSearch;
+    private getImage;
+    private getImageJPG;
+    private getImageCount;
+    private waitForImages;
     downloadAllImages(): Promise<Buffer[]>;
-    private sleep;
 }

@@ -62,11 +62,9 @@ export class GenericContentProcessor {
     }
     async createVideoOptionsFromClip(clip, clipIndex) {
         console.debug(`🔨 Creating video options from clip ${clipIndex}...`);
-        const outputFilePath = `./te-${clipIndex}.mp4`;
-        if (fs.existsSync(outputFilePath)) {
-            console.warn(`⚠️ Clip ${clipIndex} already exists. Skipping.`);
-            return null;
-        }
+        const tmpDir = os.tmpdir();
+        const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        const outputFilePath = path.join(tmpDir, `te-${clipIndex}-${uniqueSuffix}.mp4`);
         const words = extractWords(clip);
         const speechFilePath = `speech-${clipIndex}.aac`;
         this.saveAudioToFile(clip, speechFilePath);

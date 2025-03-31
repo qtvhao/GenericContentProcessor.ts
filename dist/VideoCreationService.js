@@ -1,6 +1,6 @@
 // Feature flag array
 const FEATURE_FLAGS = {
-    DEBUG_LOGGING: process.platform === 'darwin', // Toggle debug logging here!
+    DEBUG_LOGGING: process.env.DEBUG_LOGGING === 'true', // Toggle debug logging here!
 };
 // Debug log helper
 const debugLog = (...args) => {
@@ -17,6 +17,7 @@ class VideoDownloader {
     static async downloadVideo(videoBuffer, outputFilePath) {
         try {
             fs.writeFileSync(outputFilePath, videoBuffer);
+            debugLog(`✅ Video saved to ${outputFilePath}`);
         }
         catch (error) {
             debugLog("❌ Error downloading video:");
@@ -26,6 +27,7 @@ class VideoDownloader {
     }
     static async downloadVideoBuffer(response) {
         const arrayBuffer = await response.arrayBuffer();
+        debugLog("💾 Video buffer downloaded");
         return Buffer.from(arrayBuffer);
     }
     static async fetchVideoStatus(pollUrl) {
@@ -43,15 +45,19 @@ class VideoDownloader {
         }
     }
     static async handleDownloadIfReady(index, pollUrl, outputFilePath, onSuccess) {
+        debugLog(`⏳ Checking status for video ${index + 1} at ${pollUrl}`);
         const response = await this.fetchVideoStatus(pollUrl);
         const contentType = response.headers.get("content-type");
+        debugLog(`ℹ️ Content-Type received: ${contentType}`);
         if (contentType === "video/mp4") {
+            debugLog(`⬇️ Video is ready to download.`);
             const videoBuffer = await this.downloadVideoBuffer(response);
             await this.downloadVideo(videoBuffer, outputFilePath);
             console.log(`✅ [Video ${index + 1}] Download complete: ${outputFilePath}`);
             onSuccess?.(index, outputFilePath);
             return true;
         }
+        debugLog(`❌ Video not ready yet. Content-Type: ${contentType}`);
         return false;
     }
 }

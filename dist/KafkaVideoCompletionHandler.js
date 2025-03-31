@@ -15,10 +15,17 @@ export class KafkaVideoCompletionHandler {
                 topic: process.env.VIDEO_COMPLETION_GATHER_TOPIC || 'video-completion-topic',
                 groupId: 'video-manager-group',
                 eachMessageHandler: async ({ message }) => {
-                    const parsedMessage = JSON.parse(message.value?.toString() || '{}');
-                    if (parsedMessage.status === 'completed') {
-                        console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
-                        this.correlationTracker.markCompleted(parsedMessage.correlationId);
+                    try {
+                        const parsedMessage = JSON.parse(message.value?.toString() || '{}');
+                        if (parsedMessage.status === 'completed') {
+                            console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
+                            this.correlationTracker.markCompleted(parsedMessage.correlationId);
+                        }
+                    }
+                    catch (err) {
+                        console.error('⚠️ Error processing Kafka message. Delaying ack...', err);
+                        // Wait for a short duration before acknowledging the message
+                        await new Promise(res => setTimeout(res, 5000)); // 5 seconds delay
                     }
                 }
             });

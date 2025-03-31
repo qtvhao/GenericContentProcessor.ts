@@ -1,81 +1,87 @@
+// src/ImageDownloader.ts
 import axios from 'axios';
 export class ImageDownloader {
     baseUrl;
-    searchQuery;
+    query;
     limit;
-    headers;
-    cache; // Cache to store downloaded images
-    constructor(searchQuery, limit = 10) {
-        this.baseUrl = 'https://http-fotosutokku-kiban-production-80.schnworks.com/search';
-        this.searchQuery = searchQuery;
+    constructor(searchQuery, limit = 10, baseUrl = 'https://http-fotosutokku-kiban-production-80.schnworks.com') {
+        this.baseUrl = baseUrl;
+        this.query = searchQuery;
         this.limit = limit;
-        this.headers = {
-            'User-Agent': 'Mozilla/5.0 (compatible; NanoTechImageDownloader/1.0)',
-        };
-        this.cache = new Map();
     }
-    // Download a single image by index and return its buffer
-    async downloadImage(index, timeoutMs) {
-        // Check cache first
-        if (this.cache.has(index)) {
-            console.log(`Image ${index + 1} retrieved from cache.`);
-            return this.cache.get(index) || null;
+    async quickSearch(output = 'image', index = 0) {
+        if (!this.query)
+            throw new Error('Query is required for quick search.');
+        const response = await axios.post(`${this.baseUrl}/quick-search`, {
+            query: this.query,
+            output,
+            limit: String(this.limit),
+            index: String(index),
+        });
+        return response.data.conversationId;
+    }
+    async getImage(index) {
+        if (!this.query || typeof index !== 'number') {
+            throw new Error('Invalid query or index.');
         }
-        const params = {
-            query: this.searchQuery,
-            limit: this.limit,
-            output: 'image',
-            index: index,
-        };
-        const config = {
-            headers: this.headers,
-            responseType: 'arraybuffer', // get binary data
-            params: params,
-        };
-        if (timeoutMs) {
-            config.timeout = timeoutMs; // Set timeout if provided
+        const response = await axios.get(`${this.baseUrl}/get-image`, {
+            params: {
+                query: this.query,
+                output: 'image',
+                index: index.toString(),
+            },
+            responseType: 'arraybuffer',
+        });
+        if (response.headers['content-type']?.includes('application/json')) {
+            const json = JSON.parse(Buffer.from(response.data).toString());
+            throw new Error(`Image unavailable. FileKey: ${json.fileKey}`);
         }
-        try {
-            const response = await axios.get(this.baseUrl, config);
-            const contentType = response.headers['content-type'];
-            if (!contentType.includes('image')) {
-                console.warn(`Skipped index ${index}: Content-Type is ${contentType}`);
-                return null;
+        return Buffer.from(response.data);
+    }
+    async getImageJPG(index) {
+        const url = `${this.baseUrl}/get-image/image/${encodeURIComponent(this.query)}/${index}/image.jpg`;
+        const response = await axios.get(url, {
+            responseType: 'arraybuffer',
+        });
+        if (response.headers['content-type']?.includes('application/json')) {
+            const json = JSON.parse(Buffer.from(response.data).toString());
+            throw new Error(`Image unavailable. FileKey: ${json.fileKey}`);
+        }
+        return Buffer.from(response.data);
+    }
+    async getImageCount() {
+        if (!this.query)
+            throw new Error('Query is required.');
+        const url = `${this.baseUrl}/image-count/${encodeURIComponent(this.query)}`;
+        const response = await axios.get(url);
+        return response.data.count;
+    }
+    async waitForImages(options) {
+        const { retries = 5 * 60, intervalMs = 1_000, minCount = 1, } = options || {};
+        for (let attempt = 0; attempt < retries; attempt++) {
+            const count = await this.getImageCount();
+            if (count >= minCount) {
+                return count;
             }
-            const buffer = Buffer.from(response.data);
-            console.log(`Downloaded image ${index + 1} -> Buffer size: ${buffer.length} bytes`);
-            this.cache.set(index, buffer); // Store in cache
-            return buffer;
+            await new Promise(res => setTimeout(res, intervalMs));
         }
-        catch (error) {
-            console.error(`Failed to download image ${index + 1}:`, error.message);
-            return null;
-        }
+        throw new Error(`Timeout waiting for images. Tried ${retries} times.`);
     }
-    // Download images in a loop, collect their buffers
     async downloadAllImages() {
-        const imageBuffers = [];
-        for (let index = 0; index < this.limit; index++) {
-            let timeoutMs;
-            // Apply 5-second timeout to the second image (index 1)
-            if (index > 0) {
-                timeoutMs = 60_000;
-                console.log(`Applying 5-second timeout for image ${index + 1}`);
+        await this.quickSearch();
+        await this.waitForImages({ minCount: this.limit });
+        const count = await this.getImageCount();
+        const max = Math.min(this.limit, count);
+        const results = [];
+        for (let i = 0; i < max; i++) {
+            try {
+                const img = await this.getImage(i);
+                results.push(img);
             }
-            const isCached = this.cache.has(index);
-            const buffer = await this.downloadImage(index, timeoutMs);
-            if (buffer) {
-                imageBuffers.push(buffer);
-            }
-            if (!isCached) {
-                await this.sleep(1000); // Wait 1 second between requests only if not cached
+            catch (err) {
+                console.warn(`Failed to download image ${i}:`, err.message);
             }
         }
-        console.log('Download complete!');
-        return imageBuffers;
-    }
-    // Utility sleep function
-    sleep(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
+        return results;
     }
 }

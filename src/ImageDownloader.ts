@@ -78,8 +78,8 @@ export class ImageDownloader {
     minCount?: number;
   }): Promise<number> {
     const {
-      retries = 20,
-      intervalMs = 1000,
+      retries = 5 * 60,
+      intervalMs = 1_000,
       minCount = 1,
     } = options || {};
 
