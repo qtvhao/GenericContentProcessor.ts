@@ -2,6 +2,7 @@
 
 import axios from 'axios';
 import { createLogger, transports, format } from 'winston';
+import type { Logger } from 'winston';
 
 const logger = createLogger({
   level: 'info',
@@ -18,11 +19,18 @@ export class ImageDownloader {
   private baseUrl: string;
   private query: string;
   private limit: number;
+  private logger: Logger;
 
-  constructor(searchQuery: string, limit: number = 10, baseUrl: string = 'https://http-fotosutokku-kiban-production-80.schnworks.com') {
+  constructor(
+    searchQuery: string,
+    limit: number = 10,
+    baseUrl: string = 'https://http-fotosutokku-kiban-production-80.schnworks.com',
+    customLogger: Logger = logger
+  ) {
     this.baseUrl = baseUrl;
     this.query = searchQuery;
     this.limit = limit;
+    this.logger = customLogger;
   }
 
   private async quickSearch(output: OutputType = 'image', index = 0): Promise<string> {
@@ -79,7 +87,7 @@ export class ImageDownloader {
 
     const url = `${this.baseUrl}/image-count/${encodeURIComponent(this.query)}`;
     const response = await axios.get(url);
-    logger.debug(`Fetched image count for query "${this.query}": ${response.data.count}`);
+    this.logger.debug(`Fetched image count for query "${this.query}": ${response.data.count}`);
     return response.data.count;
   }
 
@@ -96,7 +104,7 @@ export class ImageDownloader {
 
     for (let attempt = 0; attempt < retries; attempt++) {
       const count = await this.getImageCount();
-      logger.debug(`Attempt ${attempt + 1}: Found ${count} images (minimum required: ${minCount})`);
+      this.logger.debug(`Attempt ${attempt + 1}: Found ${count} images (minimum required: ${minCount})`);
       if (count >= minCount) {
         return count;
       }
@@ -107,12 +115,12 @@ export class ImageDownloader {
   }
 
   public async downloadAllImages(): Promise<Buffer[]> {
-    logger.info(`Starting image download process for query "${this.query}"`);
+    this.logger.info(`Starting image download process for query "${this.query}"`);
     await this.quickSearch();
     await this.waitForImages({ minCount: this.limit });
 
     const count = await this.getImageCount();
-    logger.info(`Total available images: ${count}`);
+    this.logger.info(`Total available images: ${count}`);
     const max = Math.min(this.limit, count);
     const results: Buffer[] = [];
 
@@ -121,7 +129,7 @@ export class ImageDownloader {
         const img = await this.getImage(i);
         results.push(img);
       } catch (err) {
-        logger.warn(`Failed to download image ${i}: ${(err as Error).message}`);
+        this.logger.warn(`Failed to download image ${i}: ${(err as Error).message}`);
       }
     }
 
