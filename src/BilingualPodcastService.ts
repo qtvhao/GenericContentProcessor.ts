@@ -64,13 +64,13 @@ class BilingualPodcastService {
     try {
       const cacheKey = `podcast_${prompt.replace(/\s+/g, '_')}.json`;
       const cachedCorrelationId = await readCache(cacheKey);
-      
+
       if (cachedCorrelationId) {
         return JSON.parse(cachedCorrelationId);
       }
-      
+
       const response = await axios.post<PodcastResponse>(`${this.apiUrl}/api/podcasts`, { prompt });
-      
+
       if (response.data.correlationId) {
         await writeCache(cacheKey, Buffer.from(JSON.stringify(response.data.correlationId)));
         return response.data.correlationId;
@@ -82,28 +82,26 @@ class BilingualPodcastService {
     }
   }
 
-  async getPodcastStatus(correlationId: string): Promise<PodcastResponse|null> {
-    try {
-      const response = await axios.get<PodcastResponse>(`${this.apiUrl}/api/podcasts/${correlationId}`);
-      return response.data;
-    } catch (error) {
-      // console.error('Error fetching podcast status:', error);
-
-      return null;
-    }
+  async getPodcastStatus(correlationId: string): Promise<PodcastResponse | null> {
+    const response = await axios.get<PodcastResponse>(`${this.apiUrl}/api/podcasts/${correlationId}`, {
+      validateStatus: function (status) {
+        return status < 500;
+      }
+    });
+    return response.data;
   }
 
   async waitForPodcast(correlationId: string, maxRetries = 10, delay = 5000): Promise<PodcastResponse | null> {
     const cacheKey = `podcast_status_${correlationId}.json`;
     const cachedResponse = await readCache(cacheKey);
-    
+
     if (cachedResponse) {
       return JSON.parse(cachedResponse);
     }
-    
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const statusResponse = await this.getPodcastStatus(correlationId);
-      
+
       if (statusResponse?.error) {
         console.error('Podcast generation error:', statusResponse.error);
         return null;
@@ -112,11 +110,11 @@ class BilingualPodcastService {
         await writeCache(cacheKey, Buffer.from(JSON.stringify(statusResponse)));
         return statusResponse;
       }
-      
+
       console.log(`[BAIRINGARU] Attempt ${attempt + 1}: Podcast not ready yet. Retrying in ${delay / 1000} seconds...`);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
-    
+
     console.error('Max retries reached. Podcast not available.');
     return null;
   }
