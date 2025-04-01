@@ -72,7 +72,10 @@ export class GenericContentProcessor {
             this.imageDownloaderCache.set(query, imageDownloader);
         }
 
-        const imagesBuffer = await imageDownloader.downloadAllImages();
+        const hasEnough = await imageDownloader.hasEnoughImages();
+        const imagesBuffer = hasEnough
+            ? await imageDownloader.getAllDownloadedImages()
+            : await imageDownloader.downloadAllImages();
 
         const imageFilePaths = imagesBuffer.map((buffer, index) => {
             const tmpDir = os.tmpdir();

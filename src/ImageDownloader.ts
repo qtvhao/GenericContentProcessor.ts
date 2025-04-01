@@ -20,6 +20,7 @@ export class ImageDownloader {
   private query: string;
   private limit: number;
   private logger: Logger;
+  private downloadedImages: Buffer[] = [];
 
   constructor(
     searchQuery: string,
@@ -103,15 +104,26 @@ export class ImageDownloader {
     } = options || {};
 
     for (let attempt = 0; attempt < retries; attempt++) {
-      const count = await this.getImageCount();
-      this.logger.debug(`Attempt ${attempt + 1}: Found ${count} images (minimum required: ${minCount})`);
-      if (count >= minCount) {
+      const hasEnough = await this.hasEnoughImages(minCount);
+      this.logger.debug(`Attempt ${attempt + 1}: ${hasEnough ? 'Sufficient images found' : 'Not enough images yet'}`);
+      if (hasEnough) {
+        const count = await this.getImageCount();
         return count;
       }
       await new Promise(res => setTimeout(res, intervalMs));
     }
 
     throw new Error(`Timeout waiting for images. Tried ${retries} times.`);
+  }
+
+  public async hasEnoughImages(minCount: number = this.limit): Promise<boolean> {
+    try {
+      const count = await this.getImageCount();
+      return count >= minCount;
+    } catch (error) {
+      this.logger.error(`Error checking image count: ${(error as Error).message}`);
+      return false;
+    }
   }
 
   public async downloadAllImages(): Promise<Buffer[]> {
@@ -133,6 +145,16 @@ export class ImageDownloader {
       }
     }
 
+    this.downloadedImages = results;
     return results;
+  }
+
+  public async getAllDownloadedImages(): Promise<Buffer[]> {
+    if (this.downloadedImages.length === 0) {
+      this.logger.warn('No previously downloaded images found.');
+    } else {
+      this.logger.info(`Returning ${this.downloadedImages.length} cached images.`);
+    }
+    return this.downloadedImages;
   }
 }
