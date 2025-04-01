@@ -104,7 +104,6 @@ class BilingualPodcastService {
 
       if (statusResponse?.error) {
         console.error('Podcast generation error:', statusResponse.error);
-        return null;
       }
       if (statusResponse?.choices) {
         await writeCache(cacheKey, Buffer.from(JSON.stringify(statusResponse)));
