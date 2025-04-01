@@ -37,19 +37,20 @@ interface PodcastResponse {
 export class GenericContentProcessor {
     private svc: BilingualPodcastService;
     private imageDownloaderCache: Map<string, ImageDownloader> = new Map();
-    private logger = winston.createLogger({
-        level: 'debug',
-        format: winston.format.combine(
-            winston.format.timestamp(),
-            winston.format.printf(({ timestamp, level, message }) => {
-                return `${timestamp} [${level.toUpperCase()}]: ${message}`;
-            })
-        ),
-        transports: [new winston.transports.Console()],
-    });
+    private logger: winston.Logger;
 
-    constructor(svc: BilingualPodcastService) {
+    constructor(svc: BilingualPodcastService, logger?: winston.Logger) {
         this.svc = svc;
+        this.logger = logger || winston.createLogger({
+            level: 'debug',
+            format: winston.format.combine(
+                winston.format.timestamp(),
+                winston.format.printf(({ timestamp, level, message }) => {
+                    return `${timestamp} [${level.toUpperCase()}]: ${message}`;
+                })
+            ),
+            transports: [new winston.transports.Console()],
+        });
     }
 
     async checkServiceHealth(): Promise<boolean> {

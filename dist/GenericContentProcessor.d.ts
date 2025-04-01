@@ -1,5 +1,6 @@
 import BilingualPodcastService from "./BilingualPodcastService.js";
 import { VideoCreationOptions } from "./VideoCreationService.js";
+import winston from "winston";
 interface PodcastContent {
     translated: string;
     original: string;
@@ -36,7 +37,7 @@ export declare class GenericContentProcessor {
     private svc;
     private imageDownloaderCache;
     private logger;
-    constructor(svc: BilingualPodcastService);
+    constructor(svc: BilingualPodcastService, logger?: winston.Logger);
     checkServiceHealth(): Promise<boolean>;
     fetchImages(query: string): Promise<string[]>;
     generateContent(prompt: string): Promise<PodcastResponse | null>;

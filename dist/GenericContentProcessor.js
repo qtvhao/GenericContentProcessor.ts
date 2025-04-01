@@ -7,15 +7,16 @@ import winston from "winston";
 export class GenericContentProcessor {
     svc;
     imageDownloaderCache = new Map();
-    logger = winston.createLogger({
-        level: 'debug',
-        format: winston.format.combine(winston.format.timestamp(), winston.format.printf(({ timestamp, level, message }) => {
-            return `${timestamp} [${level.toUpperCase()}]: ${message}`;
-        })),
-        transports: [new winston.transports.Console()],
-    });
-    constructor(svc) {
+    logger;
+    constructor(svc, logger) {
         this.svc = svc;
+        this.logger = logger || winston.createLogger({
+            level: 'debug',
+            format: winston.format.combine(winston.format.timestamp(), winston.format.printf(({ timestamp, level, message }) => {
+                return `${timestamp} [${level.toUpperCase()}]: ${message}`;
+            })),
+            transports: [new winston.transports.Console()],
+        });
     }
     async checkServiceHealth() {
         this.logger.debug('🩺 Checking service health...');
