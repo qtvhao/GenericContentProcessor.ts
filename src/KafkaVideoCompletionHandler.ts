@@ -24,6 +24,8 @@ export class KafkaVideoCompletionHandler {
                         if (parsedMessage.status === 'completed') {
                             console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
                             this.correlationTracker.markCompleted(parsedMessage.correlationId);
+                        } else {
+                            console.debug(`📭 Kafka message ignored (status not completed): ${message.value?.toString()}`);
                         }
                     } catch (err) {
                         console.error('⚠️ Error processing Kafka message. Delaying ack...', err);
