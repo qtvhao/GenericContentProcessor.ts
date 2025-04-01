@@ -1,6 +1,16 @@
 // src/ImageDownloader.ts
 
 import axios from 'axios';
+import { createLogger, transports, format } from 'winston';
+
+const logger = createLogger({
+  level: 'info',
+  format: format.combine(
+    format.timestamp(),
+    format.printf(({ timestamp, level, message }) => `${timestamp} [${level.toUpperCase()}]: ${message}`)
+  ),
+  transports: [new transports.Console()],
+});
 
 export type OutputType = 'url' | 'image';
 
@@ -69,6 +79,7 @@ export class ImageDownloader {
 
     const url = `${this.baseUrl}/image-count/${encodeURIComponent(this.query)}`;
     const response = await axios.get(url);
+    logger.debug(`Fetched image count for query "${this.query}": ${response.data.count}`);
     return response.data.count;
   }
 
@@ -85,6 +96,7 @@ export class ImageDownloader {
 
     for (let attempt = 0; attempt < retries; attempt++) {
       const count = await this.getImageCount();
+      logger.debug(`Attempt ${attempt + 1}: Found ${count} images (minimum required: ${minCount})`);
       if (count >= minCount) {
         return count;
       }
@@ -95,10 +107,12 @@ export class ImageDownloader {
   }
 
   public async downloadAllImages(): Promise<Buffer[]> {
+    logger.info(`Starting image download process for query "${this.query}"`);
     await this.quickSearch();
     await this.waitForImages({ minCount: this.limit });
 
     const count = await this.getImageCount();
+    logger.info(`Total available images: ${count}`);
     const max = Math.min(this.limit, count);
     const results: Buffer[] = [];
 
@@ -107,7 +121,7 @@ export class ImageDownloader {
         const img = await this.getImage(i);
         results.push(img);
       } catch (err) {
-        console.warn(`Failed to download image ${i}:`, (err as Error).message);
+        logger.warn(`Failed to download image ${i}: ${(err as Error).message}`);
       }
     }
 

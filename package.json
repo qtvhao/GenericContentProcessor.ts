@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.7",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "winston": "^3.17.0"
   }
 }

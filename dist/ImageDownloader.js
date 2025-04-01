@@ -1,5 +1,11 @@
 // src/ImageDownloader.ts
 import axios from 'axios';
+import { createLogger, transports, format } from 'winston';
+const logger = createLogger({
+    level: 'info',
+    format: format.combine(format.timestamp(), format.printf(({ timestamp, level, message }) => `${timestamp} [${level.toUpperCase()}]: ${message}`)),
+    transports: [new transports.Console()],
+});
 export class ImageDownloader {
     baseUrl;
     query;
@@ -54,12 +60,14 @@ export class ImageDownloader {
             throw new Error('Query is required.');
         const url = `${this.baseUrl}/image-count/${encodeURIComponent(this.query)}`;
         const response = await axios.get(url);
+        logger.debug(`Fetched image count for query "${this.query}": ${response.data.count}`);
         return response.data.count;
     }
     async waitForImages(options) {
         const { retries = 5 * 60, intervalMs = 1_000, minCount = 1, } = options || {};
         for (let attempt = 0; attempt < retries; attempt++) {
             const count = await this.getImageCount();
+            logger.debug(`Attempt ${attempt + 1}: Found ${count} images (minimum required: ${minCount})`);
             if (count >= minCount) {
                 return count;
             }
@@ -68,9 +76,11 @@ export class ImageDownloader {
         throw new Error(`Timeout waiting for images. Tried ${retries} times.`);
     }
     async downloadAllImages() {
+        logger.info(`Starting image download process for query "${this.query}"`);
         await this.quickSearch();
         await this.waitForImages({ minCount: this.limit });
         const count = await this.getImageCount();
+        logger.info(`Total available images: ${count}`);
         const max = Math.min(this.limit, count);
         const results = [];
         for (let i = 0; i < max; i++) {
@@ -79,7 +89,7 @@ export class ImageDownloader {
                 results.push(img);
             }
             catch (err) {
-                console.warn(`Failed to download image ${i}:`, err.message);
+                logger.warn(`Failed to download image ${i}: ${err.message}`);
             }
         }
         return results;
