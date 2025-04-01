@@ -90,7 +90,7 @@ export class GenericContentProcessor {
 
     async generateContent(prompt: string): Promise<PodcastResponse | null> {
         this.logger.debug('🎤 Generating content for prompt:', prompt);
-        const response = await this.svc.createAndWaitForPodcast(prompt);
+        const response = await this.svc.createAndWaitForPodcast(prompt, 12 * 30, 20_000);
         if (response) {
             this.logger.debug('✅ Content generated.');
         } else {
