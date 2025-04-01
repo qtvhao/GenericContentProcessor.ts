@@ -5,6 +5,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { extractWords } from "./utils/words.js";
+import winston from "winston";
 
 interface PodcastContent {
     translated: string;
@@ -36,27 +37,37 @@ interface PodcastResponse {
 export class GenericContentProcessor {
     private svc: BilingualPodcastService;
     private imageDownloaderCache: Map<string, ImageDownloader> = new Map();
+    private logger = winston.createLogger({
+        level: 'debug',
+        format: winston.format.combine(
+            winston.format.timestamp(),
+            winston.format.printf(({ timestamp, level, message }) => {
+                return `${timestamp} [${level.toUpperCase()}]: ${message}`;
+            })
+        ),
+        transports: [new winston.transports.Console()],
+    });
 
     constructor(svc: BilingualPodcastService) {
         this.svc = svc;
     }
 
     async checkServiceHealth(): Promise<boolean> {
-        console.debug('🩺 Checking service health...');
+        this.logger.debug('🩺 Checking service health...');
         const isHealthy = await this.svc.checkHealth();
         if (!isHealthy) {
-            console.error('🚑 Service health check failed. Aborting...');
+            this.logger.error('🚑 Service health check failed. Aborting...');
         } else {
-            console.debug('✅ Service health check passed.');
+            this.logger.debug('✅ Service health check passed.');
         }
         return isHealthy;
     }
 
     async fetchImages(query: string): Promise<string[]> {
-        console.debug(`📥 Fetching images for query: "${query}"`);
+        this.logger.debug(`📥 Fetching images for query: "${query}"`);
         let imageDownloader = this.imageDownloaderCache.get(query);
         if (!imageDownloader) {
-            imageDownloader = new ImageDownloader(query, 12);
+            imageDownloader = new ImageDownloader(query, 12, undefined, this.logger);
             this.imageDownloaderCache.set(query, imageDownloader);
         }
 
@@ -66,7 +77,7 @@ export class GenericContentProcessor {
             const tmpDir = os.tmpdir();
             const filePath = path.join(tmpDir, `temp_image_${query.replace(/\s+/g, '_')}_${index}.jpg`);
             fs.writeFileSync(filePath, buffer);
-            console.debug(`💾 Saved image ${index} for query "${query}" at ${filePath}`);
+            this.logger.debug(`💾 Saved image ${index} for query "${query}" at ${filePath}`);
             return filePath;
         });
 
@@ -74,18 +85,18 @@ export class GenericContentProcessor {
     }
 
     async generateContent(prompt: string): Promise<PodcastResponse | null> {
-        console.debug('🎤 Generating content for prompt:', prompt);
+        this.logger.debug('🎤 Generating content for prompt:', prompt);
         const response = await this.svc.createAndWaitForPodcast(prompt);
         if (response) {
-            console.debug('✅ Content generated.');
+            this.logger.debug('✅ Content generated.');
         } else {
-            console.error('❌ Content generation failed.');
+            this.logger.error('❌ Content generation failed.');
         }
         return response;
     }
 
     extractClipsFromResponse(response: PodcastResponse | null): Clip[] {
-        console.debug('🔎 Extracting clips from response...');
+        this.logger.debug('🔎 Extracting clips from response...');
         const audioBuffer = Buffer.from(response?.choices[0].message.audio.data || '', 'base64');
         return (response?.choices[0].message.audio.trimmed || []).map((clip, idx) => ({
             ...clip,
@@ -94,12 +105,12 @@ export class GenericContentProcessor {
     }
 
     private saveAudioToFile(clip: Clip, filePath: string): void {
-        console.debug(`💽 Saving audio to ${filePath}`);
+        this.logger.debug(`💽 Saving audio to ${filePath}`);
         fs.writeFileSync(filePath, clip.audioBuffer || '');
     }
 
     async createVideoOptionsFromClip(clip: Clip, clipIndex: number): Promise<VideoCreationOptions | null> {
-        console.debug(`🔨 Creating video options from clip ${clipIndex}...`);
+        this.logger.debug(`🔨 Creating video options from clip ${clipIndex}...`);
         const tmpDir = os.tmpdir();
         const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
         const outputFilePath = path.join(tmpDir, `te-${clipIndex}-${uniqueSuffix}.mp4`);
@@ -129,7 +140,7 @@ export class GenericContentProcessor {
     }
 
     async compileVideoCreationOptions(clips: Clip[]): Promise<VideoCreationOptions[]> {
-        console.debug('📋 Compiling video creation options...');
+        this.logger.debug('📋 Compiling video creation options...');
         const options: VideoCreationOptions[] = [];
 
         for (let i = 0; i < clips.length; i++) {
