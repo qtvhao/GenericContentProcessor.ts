@@ -272,23 +272,28 @@ class VideoCreationService {
   }
 
   private static validateAndResolveFiles(options: VideoCreationOptions) {
+    if (!options.imageFilePaths || options.imageFilePaths.length === 0) {
+      throw new Error("No image files provided.");
+    }
+
     const absSpeechFilePath = path.resolve(options.speechFilePath);
     const absMusicFilePath = path.resolve(options.musicFilePath);
     const absImageFilePaths = options.imageFilePaths.map(imagePath => path.resolve(imagePath));
 
-    if (!fs.existsSync(absSpeechFilePath)) {
-      throw new Error(`Speech file not found at path: ${absSpeechFilePath}`);
+    if (!fs.existsSync(absSpeechFilePath) || fs.statSync(absSpeechFilePath).size === 0) {
+      throw new Error(`Speech file is missing or empty: ${absSpeechFilePath}`);
     }
 
-    if (!fs.existsSync(absMusicFilePath)) {
-      throw new Error(`Music file not found at path: ${absMusicFilePath}`);
+    if (!fs.existsSync(absMusicFilePath) || fs.statSync(absMusicFilePath).size === 0) {
+      throw new Error(`Music file is missing or empty: ${absMusicFilePath}`);
     }
 
     absImageFilePaths.forEach((imagePath) => {
-      if (!fs.existsSync(imagePath)) {
-        throw new Error(`Image file not found at path: ${imagePath}`);
+      if (!fs.existsSync(imagePath) || fs.statSync(imagePath).size === 0) {
+        throw new Error(`Image file is missing or empty: ${imagePath}`);
       }
     });
+    
 
     return { absSpeechFilePath, absMusicFilePath, absImageFilePaths };
   }
