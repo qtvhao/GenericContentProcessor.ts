@@ -1,4 +1,4 @@
-import { CorrelationTracker } from "./utils/CorrelationTracker.js";
+import { CorrelationTracker, LogLevel } from "./utils/CorrelationTracker.js";
 import { startKafkaConsumer } from "./kafka/kafkaConsumer.js";
 
 export class KafkaVideoCompletionHandler {
@@ -7,6 +7,7 @@ export class KafkaVideoCompletionHandler {
 
     constructor() {
         this.startConsumer();
+        this.correlationTracker.setLogLevel(LogLevel.DEBUG)
     }
 
     private async startConsumer() {
@@ -25,6 +26,7 @@ export class KafkaVideoCompletionHandler {
                             console.debug(`📨 Kafka message received: ${message.value?.toString()}`);
                             this.correlationTracker.markCompleted(parsedMessage.correlationId);
                         } else {
+                            this.correlationTracker.setProgress(parsedMessage.correlationId, parsedMessage.progress)
                             console.debug(`📭 Kafka message ignored (status not completed): ${message.value?.toString()}`);
                         }
                     } catch (err) {
@@ -56,13 +58,10 @@ export class KafkaVideoCompletionHandler {
         for (const [id, { filePath }] of correlationMap.entries()) {
             console.debug(`🔗 Tracking correlationId: ${id} -> ${filePath}`);
         }
+        await this.correlationTracker.waitForAll(correlationIds)
+        console.log('🏋️ All video completions received via Kafka!');
 
-        return new Promise<void>((resolve) => {
-            this.correlationTracker.waitForAll(correlationIds).then(() => {
-                console.log('🏋️ All video completions received via Kafka!');
-                resolve();
-            });
-        });
+        return;
     }
 
     private buildCorrelationMap(
