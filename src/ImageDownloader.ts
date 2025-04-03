@@ -75,4 +75,11 @@ export class ImageDownloader {
   public hasEnoughImages(): boolean {
     return this.downloadedImages.length >= this.limit;
   }
+
+  public async getOrDownloadImages(): Promise<Buffer[]> {
+    if (this.hasEnoughImages()) {
+      return this.getAllDownloadedImages();
+    }
+    return this.downloadAllImages();
+  }
 }

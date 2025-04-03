@@ -72,10 +72,7 @@ export class GenericContentProcessor {
             this.imageDownloaderCache.set(query, imageDownloader);
         }
 
-        const hasEnough = imageDownloader.hasEnoughImages();
-        const imagesBuffer = hasEnough
-            ? await imageDownloader.getAllDownloadedImages()
-            : await imageDownloader.downloadAllImages();
+        const imagesBuffer = await imageDownloader.getOrDownloadImages();
 
         const imageFilePaths = imagesBuffer.map((buffer, index) => {
             const tmpDir = os.tmpdir();
@@ -87,7 +84,6 @@ export class GenericContentProcessor {
 
         if (imageFilePaths.length === 0) {
             this.logger.error(`❌ No images were fetched for query "${query}"`);
-            this.logger.debug(`🧠 Context - hasEnough: ${hasEnough}, imageBuffer length: ${imagesBuffer.length}`);
             throw new Error(`No images fetched for query: ${query}`);
         }
 
