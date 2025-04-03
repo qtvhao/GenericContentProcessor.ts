@@ -68,11 +68,11 @@ export class GenericContentProcessor {
         this.logger.debug(`📥 Fetching images for query: "${query}"`);
         let imageDownloader = this.imageDownloaderCache.get(query);
         if (!imageDownloader) {
-            imageDownloader = new ImageDownloader(query, 12, undefined, this.logger);
+            imageDownloader = new ImageDownloader(query, 12, this.logger);
             this.imageDownloaderCache.set(query, imageDownloader);
         }
 
-        const hasEnough = await imageDownloader.hasEnoughImages();
+        const hasEnough = imageDownloader.hasEnoughImages();
         const imagesBuffer = hasEnough
             ? await imageDownloader.getAllDownloadedImages()
             : await imageDownloader.downloadAllImages();
