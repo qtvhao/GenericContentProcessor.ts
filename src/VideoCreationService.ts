@@ -335,6 +335,11 @@ class VideoCreationService {
       },
     });
 
+    if (response.status === 400) {
+      debugLog("❌ 400 Bad Request response body:", response.data);
+      throw new Error("Bad Request: Please check the provided video creation data.");
+    }
+
     const correlationId = response.data['correlation_id'];
     debugLog(`✅ Video processing started. Correlation ID: ${correlationId}`);
 
