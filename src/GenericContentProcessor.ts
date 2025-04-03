@@ -28,6 +28,7 @@ interface Clip {
     endTime: number;
     audioBase64: string;
     audioBuffer?: Buffer;
+    fps?: number;
 }
 
 interface PodcastResponse {
@@ -115,7 +116,7 @@ export class GenericContentProcessor {
         fs.writeFileSync(filePath, clip.audioBuffer || '');
     }
 
-    async createVideoOptionsFromClip(clip: Clip, clipIndex: number): Promise<VideoCreationOptions | null> {
+    private async createVideoOptionsFromClip(clip: Clip, clipIndex: number, fps?: number): Promise<VideoCreationOptions | null> {
         this.logger.debug(`🔨 Creating video options from clip ${clipIndex}...`);
         const tmpDir = os.tmpdir();
         const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -135,7 +136,7 @@ export class GenericContentProcessor {
             imageFilePaths,
             textData: words,
             duration: words[words.length - 1]?.end || clip.endTime,
-            fps: 2,
+            fps: clip.fps ?? fps ?? 2,
             videoSize: [1920, 1080],
             textConfig: {
                 font_color: 'white',
