@@ -85,6 +85,12 @@ export class GenericContentProcessor {
             return filePath;
         });
 
+        if (imageFilePaths.length === 0) {
+            this.logger.error(`❌ No images were fetched for query "${query}"`);
+            this.logger.debug(`🧠 Context - hasEnough: ${hasEnough}, imageBuffer length: ${imagesBuffer.length}`);
+            throw new Error(`No images fetched for query: ${query}`);
+        }
+
         return imageFilePaths;
     }
 
