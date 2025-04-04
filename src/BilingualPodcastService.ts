@@ -7,6 +7,7 @@ interface PodcastContent {
 }
 
 interface PodcastAudioSegment {
+  parentTaskId: string;
   segments: any[];
   original: string;
   translated: string;
