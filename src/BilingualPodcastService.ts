@@ -110,7 +110,7 @@ class BilingualPodcastService {
     return null;
   }
 
-  async waitForPodcast(correlationId: string, maxRetries = 10, delay = 5000): Promise<PodcastResponse | null> {
+  async waitForPodcast(correlationId: string, maxRetries = 10, delay = 5000, maxFiveXXRetries: number = 5): Promise<PodcastResponse | null> {
     const cacheKey = `podcast_status_${correlationId}.json`;
     const cachedResponse = await readCache(cacheKey);
 
@@ -119,7 +119,7 @@ class BilingualPodcastService {
     }
 
     let fiveXXRetryCount = 0;
-    while (fiveXXRetryCount < 3) {
+    while (fiveXXRetryCount < maxFiveXXRetries) {
       try {
         const statusResponse = await this.pollForPodcastStatus(correlationId, maxRetries, delay);
         if (statusResponse) {
@@ -130,7 +130,7 @@ class BilingualPodcastService {
       } catch (error: any) {
         if (error.response && error.response.status >= 500 && error.response.status < 600) {
           fiveXXRetryCount++;
-          console.warn(`5xx error encountered (${fiveXXRetryCount}/3). Retrying...`);
+          console.warn(`5xx error (${error.response.status}) encountered (${fiveXXRetryCount}/${maxFiveXXRetries}). Retrying...`);
           await new Promise((resolve) => setTimeout(resolve, 60_000));
         } else {
           console.error('Error waiting for podcast:', error);
