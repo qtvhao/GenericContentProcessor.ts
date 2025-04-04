@@ -46,7 +46,10 @@ class CorrelationTracker {
     markCompleted(correlationId: string): void {
         this.pendingCorrelations.set(correlationId, true);
         this.log(LogLevel.INFO, `Marked completed: ${correlationId}`);
+        this._resolveCompletedWaiters(correlationId);
+    }
 
+    private _resolveCompletedWaiters(correlationId: string): void {
         for (const { ids, resolve } of [...this.waitingResolvers]) {
             console.debug(this.calculateTotalProgress(ids))
             const allDone = ids.every(id => this.pendingCorrelations.get(id) === true);
