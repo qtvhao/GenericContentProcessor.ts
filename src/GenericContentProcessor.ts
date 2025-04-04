@@ -22,6 +22,7 @@ interface Segment {
 }
 
 interface Clip {
+    parentTaskId: string;
     segments: Segment[];
     query: string;
     startTime: number;
@@ -137,6 +138,7 @@ export class GenericContentProcessor {
             textData: words,
             duration: words[words.length - 1]?.end || clip.endTime,
             fps: clip.fps ?? fps ?? 2,
+            parentTaskId: clip.parentTaskId,
             videoSize: [1920, 1080],
             textConfig: {
                 font_color: 'white',

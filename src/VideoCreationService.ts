@@ -32,6 +32,7 @@ export interface VideoCreationOptions {
   videoSize?: [number, number];
   textConfig?: { font_color: string; background_color: string };
   fps?: number;
+  parentTaskId: string;
   duration: number;
   outputFilePath: string;
 }
