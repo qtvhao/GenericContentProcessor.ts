@@ -320,6 +320,7 @@ class VideoCreationService {
       JSON.stringify(options.textConfig || { font_color: "white", background_color: "black" })
     );
     formData.append("fps", `${options.fps || 24}`);
+    formData.append("parent_task_id", options.parentTaskId);
     formData.append("duration", `${options.duration}`);
     formData.append("start_time", `${options.startTime}`);
     formData.append("end_time", `${options.endTime}`);
