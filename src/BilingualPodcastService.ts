@@ -69,8 +69,11 @@ class BilingualPodcastService {
         return response.data.correlationId;
       }
       throw new Error('Failed to retrieve correlationId');
-    } catch (error) {
-      console.error('Error creating podcast:', error);
+    } catch (error: any) {
+      console.error('Error creating podcast:', error?.message || error);
+      if (error?.response?.data) {
+        console.error('Response data:', error.response.data);
+      }
       throw error;
     }
   }
@@ -90,6 +93,7 @@ class BilingualPodcastService {
 
       if (statusResponse?.error) {
         console.error('Podcast generation error:', statusResponse.error);
+        console.debug('Debug context:', JSON.stringify(statusResponse, null, 2));
       }
       if (statusResponse?.choices) {
         return statusResponse;
@@ -103,8 +107,6 @@ class BilingualPodcastService {
   }
 
   private async waitForPodcast(correlationId: string, maxRetries = 10, delay = 5000, maxFiveXXRetries: number = 5): Promise<PodcastResponse | null> {
-    const cacheKey = `podcast_status_${correlationId}.json`;
-
     let fiveXXRetryCount = 0;
     while (fiveXXRetryCount < maxFiveXXRetries) {
       try {
