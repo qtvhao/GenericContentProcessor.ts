@@ -61,19 +61,11 @@ class BilingualPodcastService {
     }
   }
 
-  async createPodcast(prompt: string): Promise<string> {
+  private async createPodcast(prompt: string): Promise<string> {
     try {
-      const cacheKey = `podcast_${prompt.replace(/\s+/g, '_')}.json`;
-      const cachedCorrelationId = await readCache(cacheKey);
-
-      if (cachedCorrelationId) {
-        return JSON.parse(cachedCorrelationId);
-      }
-
       const response = await axios.post<PodcastResponse>(`${this.apiUrl}/api/podcasts`, { prompt });
 
       if (response.data.correlationId) {
-        await writeCache(cacheKey, Buffer.from(JSON.stringify(response.data.correlationId)));
         return response.data.correlationId;
       }
       throw new Error('Failed to retrieve correlationId');
@@ -83,7 +75,7 @@ class BilingualPodcastService {
     }
   }
 
-  async getPodcastStatus(correlationId: string): Promise<PodcastResponse | null> {
+  private async getPodcastStatus(correlationId: string): Promise<PodcastResponse | null> {
     const response = await axios.get<PodcastResponse>(`${this.apiUrl}/api/podcasts/${correlationId}`, {
       validateStatus: function (status) {
         return status < 500;
@@ -110,20 +102,14 @@ class BilingualPodcastService {
     return null;
   }
 
-  async waitForPodcast(correlationId: string, maxRetries = 10, delay = 5000, maxFiveXXRetries: number = 5): Promise<PodcastResponse | null> {
+  private async waitForPodcast(correlationId: string, maxRetries = 10, delay = 5000, maxFiveXXRetries: number = 5): Promise<PodcastResponse | null> {
     const cacheKey = `podcast_status_${correlationId}.json`;
-    const cachedResponse = await readCache(cacheKey);
-
-    if (cachedResponse) {
-      return JSON.parse(cachedResponse);
-    }
 
     let fiveXXRetryCount = 0;
     while (fiveXXRetryCount < maxFiveXXRetries) {
       try {
         const statusResponse = await this.pollForPodcastStatus(correlationId, maxRetries, delay);
         if (statusResponse) {
-          await writeCache(cacheKey, Buffer.from(JSON.stringify(statusResponse)));
           return statusResponse;
         }
         break; // Exit loop if response is null (maxRetries reached)
@@ -143,10 +129,32 @@ class BilingualPodcastService {
     return null;
   }
 
+  private hashPromptDjb2(prompt: string): number {
+    let hash = 5381;
+    for (let i = 0; i < prompt.length; i++) {
+      hash = ((hash << 5) + hash) + prompt.charCodeAt(i);
+    }
+    return hash >>> 0; // Ensure unsigned 32-bit
+  }
+
   async createAndWaitForPodcast(prompt: string, maxRetries = 12 * 30, delay = 5000): Promise<PodcastResponse | null> {
+    const hash = this.hashPromptDjb2(prompt);
+    const cacheKey = `full_podcast_${hash}.json`;
+
     try {
+      const cachedResponse = await readCache(cacheKey);
+      if (cachedResponse) {
+        return JSON.parse(cachedResponse);
+      }
+
       const correlationId = await this.createPodcast(prompt);
-      return await this.waitForPodcast(correlationId, maxRetries, delay);
+      const response = await this.waitForPodcast(correlationId, maxRetries, delay);
+
+      if (response) {
+        await writeCache(cacheKey, Buffer.from(JSON.stringify(response)));
+      }
+
+      return response;
     } catch (error) {
       console.error('Error creating and waiting for podcast:', error);
       return null;
