@@ -15,7 +15,7 @@ export class ImageServer {
         this.limit = limit;
     }
 
-    public async startQuickSearchSession(output: OutputType = 'image', index = 0): Promise<string> {
+    public async startQuickSearchSession(taskId: string, output: OutputType = 'image', index = 0): Promise<string> {
         if (!this.query) throw new Error('Query is required for quick search.');
 
         const response = await axios.post(`${this.baseUrl}/quick-search`, {
@@ -23,6 +23,7 @@ export class ImageServer {
             output,
             limit: String(this.limit),
             index: String(index),
+            taskId,
         });
 
         return response.data.conversationId;

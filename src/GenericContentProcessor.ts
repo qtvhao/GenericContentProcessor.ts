@@ -66,11 +66,11 @@ export class GenericContentProcessor {
         return isHealthy;
     }
 
-    async fetchImages(query: string): Promise<string[]> {
+    async fetchImages(query: string, taskId: string): Promise<string[]> {
         this.logger.debug(`📥 Fetching images for query: "${query}"`);
         let imageDownloader = this.imageDownloaderCache.get(query);
         if (!imageDownloader) {
-            imageDownloader = new ImageDownloader(query, 12, this.logger);
+            imageDownloader = new ImageDownloader(query, 12, this.logger, taskId);
             this.imageDownloaderCache.set(query, imageDownloader);
         }
 
@@ -117,7 +117,7 @@ export class GenericContentProcessor {
         fs.writeFileSync(filePath, clip.audioBuffer || '');
     }
 
-    private async createVideoOptionsFromClip(clip: Clip, clipIndex: number, fps?: number): Promise<VideoCreationOptions | null> {
+    private async createVideoOptionsFromClip(clip: Clip, clipIndex: number, taskId: string, fps?: number): Promise<VideoCreationOptions | null> {
         this.logger.debug(`🔨 Creating video options from clip ${clipIndex}...`);
         const tmpDir = os.tmpdir();
         const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -127,7 +127,7 @@ export class GenericContentProcessor {
         const speechFilePath = `speech-${clipIndex}.aac`;
         this.saveAudioToFile(clip, speechFilePath);
 
-        const imageFilePaths = await this.fetchImages(clip.query);
+        const imageFilePaths = await this.fetchImages(clip.query, taskId);
 
         return {
             startTime: clip.startTime,
@@ -148,12 +148,12 @@ export class GenericContentProcessor {
         };
     }
 
-    async compileVideoCreationOptions(clips: Clip[]): Promise<VideoCreationOptions[]> {
+    async compileVideoCreationOptions(clips: Clip[], taskId: string): Promise<VideoCreationOptions[]> {
         this.logger.debug('📋 Compiling video creation options...');
         const options: VideoCreationOptions[] = [];
 
         for (let i = 0; i < clips.length; i++) {
-            const option = await this.createVideoOptionsFromClip(clips[i], i + 1);
+            const option = await this.createVideoOptionsFromClip(clips[i], i + 1, taskId);
             if (option) {
                 options.push(option);
             }

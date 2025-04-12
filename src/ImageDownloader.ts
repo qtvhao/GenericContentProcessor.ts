@@ -16,15 +16,18 @@ export class ImageDownloader {
   private limit: number;
   private logger: Logger;
   private downloadedImages: Buffer[] = [];
+  private taskId: string;
 
   constructor(
     searchQuery: string,
     limit: number = 10,
-    customLogger: Logger = logger
+    customLogger: Logger = logger,
+    taskId: string,
   ) {
     this.query = searchQuery;
     this.limit = limit;
     this.logger = customLogger;
+    this.taskId = taskId;
   }
 
   public async downloadAllImages(): Promise<Buffer[]> {
@@ -36,7 +39,7 @@ export class ImageDownloader {
     this.logger.info(`Total available images before search: ${count}`);
     
     if (count < this.limit) {
-      await server.startQuickSearchSession();
+      await server.startQuickSearchSession(this.taskId);
       await server.waitForImages({ minCount: this.limit });
     }
 
