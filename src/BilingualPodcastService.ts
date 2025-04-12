@@ -61,9 +61,9 @@ class BilingualPodcastService {
     }
   }
 
-  private async createPodcast(prompt: string): Promise<string> {
+  private async createPodcast(prompt: string, taskId: string): Promise<string> {
     try {
-      const response = await axios.post<PodcastResponse>(`${this.apiUrl}/api/podcasts`, { prompt });
+      const response = await axios.post<PodcastResponse>(`${this.apiUrl}/api/podcasts`, { prompt, taskId });
 
       if (response.data.correlationId) {
         return response.data.correlationId;
@@ -139,7 +139,7 @@ class BilingualPodcastService {
     return hash >>> 0; // Ensure unsigned 32-bit
   }
 
-  async createAndWaitForPodcast(prompt: string, maxRetries = 12 * 30, delay = 5000): Promise<PodcastResponse | null> {
+  async createAndWaitForPodcast(prompt: string, taskId: string, maxRetries = 12 * 30, delay = 5000): Promise<PodcastResponse | null> {
     const hash = this.hashPromptDjb2(prompt);
     const cacheKey = `full_podcast_${hash}.json`;
 
@@ -149,7 +149,7 @@ class BilingualPodcastService {
         return JSON.parse(cachedResponse);
       }
 
-      const correlationId = await this.createPodcast(prompt);
+      const correlationId = await this.createPodcast(prompt, taskId);
       const response = await this.waitForPodcast(correlationId, maxRetries, delay);
 
       if (response) {

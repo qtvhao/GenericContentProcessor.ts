@@ -92,9 +92,9 @@ export class GenericContentProcessor {
         return imageFilePaths;
     }
 
-    async generateContent(prompt: string): Promise<PodcastResponse | null> {
-        this.logger.debug('🎤 Generating content for prompt:', prompt);
-        const response = await this.svc.createAndWaitForPodcast(prompt, 12 * 30, 20_000);
+    async generateContent(prompt: string, taskId: string): Promise<PodcastResponse | null> {
+        this.logger.debug('🎤 Generating content for prompt:', prompt, taskId);
+        const response = await this.svc.createAndWaitForPodcast(prompt, taskId, 12 * 30, 20_000);
         if (response) {
             this.logger.debug('✅ Content generated.');
         } else {
