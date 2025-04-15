@@ -40,9 +40,13 @@ export class GenericContentProcessor {
     private svc: BilingualPodcastService;
     private imageDownloaderCache: Map<string, ImageDownloader> = new Map();
     private logger: winston.Logger;
+    private finalLanguage: string;
+    private avoidCodeSwitchingFromLanguage: string;
 
-    constructor(svc: BilingualPodcastService, logger?: winston.Logger) {
+    constructor(svc: BilingualPodcastService, finalLanguage: string, avoidCodeSwitchingFromLanguage: string, logger?: winston.Logger) {
         this.svc = svc;
+        this.finalLanguage = finalLanguage;
+        this.avoidCodeSwitchingFromLanguage = avoidCodeSwitchingFromLanguage;
         this.logger = logger || winston.createLogger({
             level: 'debug',
             format: winston.format.combine(
@@ -94,6 +98,9 @@ export class GenericContentProcessor {
 
     async generateContent(prompt: string, taskId: string): Promise<PodcastResponse | null> {
         this.logger.debug('🎤 Generating content for prompt:', prompt, taskId);
+        prompt = prompt
+            .replace('<final_language>', this.finalLanguage)
+            .replace('<avoid_code_switching_from_language>', this.avoidCodeSwitchingFromLanguage);
         const response = await this.svc.createAndWaitForPodcast(prompt, taskId, 12 * 30, 20_000);
         if (response) {
             this.logger.debug('✅ Content generated.');
